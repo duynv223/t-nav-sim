@@ -306,14 +306,14 @@ watch(() => props.route.segments.map(s => s.speedProfile.type), (newTypes, oldTy
 
           <button 
             @click="handleClear"
-            :disabled="route.points.length === 0"
+            :disabled="route.points.length === 0 || props.simState === 'running'"
             :class="[
               'h-10 w-10 flex items-center justify-center rounded-md transition-colors',
-              route.points.length === 0
+              route.points.length === 0 || props.simState === 'running'
                 ? 'bg-gray-50 text-gray-300 cursor-not-allowed'
                 : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
             ]"
-            :title="route.points.length === 0 ? 'No points to clear' : 'Clear all waypoints and segments'">
+            :title="props.simState === 'running' ? 'Stop simulation to clear route' : (route.points.length === 0 ? 'No points to clear' : 'Clear all waypoints and segments')">
             <Trash2 :size="18" />
           </button>
 
