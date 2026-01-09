@@ -21,6 +21,7 @@ const props = defineProps<{
   onSelectWaypoint: (idx: number) => void
   onSelectSegment: (idx: number) => void
   onFocusStart: () => void
+  onSplitSegment: () => void
 }>()
 
 const showClearConfirm = ref(false)
@@ -284,6 +285,25 @@ watch(() => props.route.segments.map(s => s.speedProfile.type), (newTypes, oldTy
             <MapPinPlus :size="20" :class="mode === 'add' ? 'rotate-12' : ''" class="transition-transform" />
           </button>
           
+          <button 
+            @click="props.onSplitSegment"
+            :disabled="!hasSelectedSegment"
+            :class="[
+              'h-10 w-10 flex items-center justify-center rounded-md transition-colors',
+              !hasSelectedSegment
+                ? 'bg-gray-50 text-gray-300 cursor-not-allowed'
+                : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+            ]"
+            :title="hasSelectedSegment ? 'Split selected segment' : 'Select a segment to split'">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="h-5 w-5">
+              <circle cx="6" cy="12" r="2"></circle>
+              <circle cx="12" cy="12" r="2"></circle>
+              <circle cx="18" cy="12" r="2"></circle>
+              <line x1="8" y1="12" x2="10" y2="12"></line>
+              <line x1="14" y1="12" x2="16" y2="12"></line>
+            </svg>
+          </button>
+
           <button 
             @click="handleClear"
             :disabled="route.points.length === 0"

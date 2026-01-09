@@ -32,6 +32,7 @@
         :onSelectWaypoint="onSelectWaypoint"
         :onSelectSegment="onSelectSegment"
         :onFocusStart="focusStart"
+        :onSplitSegment="splitSelectedSegment"
         :onAddWaypoint="onAddWaypoint"
         :onDeleteWaypoint="onDeleteWaypoint"
         :onMoveWaypoint="onMoveWaypoint"
@@ -230,6 +231,18 @@ function focusStart(){
     detail: { lat: firstPoint.lat, lon: firstPoint.lon, zoom: 14 }
   })
   window.dispatchEvent(focusEvent)
+}
+
+function splitSelectedSegment(){
+  const idx = route.value.segments.findIndex(s => s.isSelected)
+  if (idx < 0) {
+    alert('Please select a segment to split')
+    return
+  }
+  const ok = route.value.splitSegment(idx)
+  if (!ok) {
+    alert('Cannot split this segment right now')
+  }
 }
 
 const backendUrl = import.meta.env.VITE_API_URL || 'http://localhost:8000'

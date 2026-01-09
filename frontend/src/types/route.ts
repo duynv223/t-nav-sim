@@ -230,6 +230,66 @@ export class Route {
       this.segments.push(seg)
     }
   }
+
+  splitSegment(idx: number): boolean {
+    if (this.simulatingSegmentRange) return false
+    if (idx < 0 || idx >= this.segments.length) return false
+    if (this.isSegmentLocked(idx)) return false
+
+    const fromPoint = this.points[idx]
+    const toPoint = this.points[idx + 1]
+    if (!fromPoint || !toPoint) return false
+
+    const midPoint = new RoutePoint(
+      (fromPoint.lat + toPoint.lat) / 2,
+      (fromPoint.lon + toPoint.lon) / 2
+    )
+
+    const oldSegments = this.segments
+    const oldSelectedIdx = oldSegments.findIndex(s => s.isSelected)
+
+    this.points.splice(idx + 1, 0, midPoint)
+
+    const newSegments: RouteSegment[] = []
+    for (let i = 0; i + 1 < this.points.length; i++) {
+      let sourceIdx: number
+      if (i === idx || i === idx + 1) {
+        sourceIdx = idx
+      } else if (i < idx) {
+        sourceIdx = i
+      } else {
+        sourceIdx = i - 1
+      }
+
+      const source = oldSegments[sourceIdx]
+      const speedProfile = JSON.parse(JSON.stringify(source.speedProfile))
+      const seg = new RouteSegment(i, i + 1, speedProfile)
+      seg.setState(source.state)
+      newSegments.push(seg)
+    }
+
+    newSegments.forEach(s => s.isSelected = false)
+    if (oldSelectedIdx >= 0) {
+      if (oldSelectedIdx === idx) {
+        newSegments[idx].isSelected = true
+        this.selectedType = SelectionType.SEGMENT
+      } else if (oldSelectedIdx > idx) {
+        const shiftedIdx = oldSelectedIdx + 1
+        if (newSegments[shiftedIdx]) {
+          newSegments[shiftedIdx].isSelected = true
+          this.selectedType = SelectionType.SEGMENT
+        }
+      } else {
+        newSegments[oldSelectedIdx].isSelected = true
+        this.selectedType = SelectionType.SEGMENT
+      }
+    } else {
+      this.selectedType = null
+    }
+
+    this.segments = newSegments
+    return true
+  }
   
   updateSegmentStates(currentLat: number, currentLon: number): void {
     if (this.segments.length === 0) return
