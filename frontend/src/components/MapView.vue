@@ -1,6 +1,53 @@
 <template>
-  <div class="relative w-full h-full">
-    <div ref="mapEl" style="width:100%; height:100%;"></div>
+  <div class="map-root relative w-full h-full">
+    <div ref="mapEl" class="map-canvas" style="width:100%; height:100%;"></div>
+
+    <div class="absolute top-3 left-3 z-40 w-[320px]">
+      <div class="bg-white/95 backdrop-blur rounded-lg shadow-lg border border-gray-200 overflow-hidden">
+        <div class="p-2">
+          <div class="relative">
+            <span class="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="h-4 w-4">
+                <circle cx="11" cy="11" r="7"></circle>
+                <line x1="16.65" y1="16.65" x2="21" y2="21"></line>
+              </svg>
+            </span>
+            <input
+              v-model="searchQuery"
+              type="text"
+              class="w-full h-9 pl-9 pr-8 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              placeholder="Search address or place"
+              @keydown.enter.prevent="runSearch"
+            />
+            <button
+              v-if="searchQuery.length > 0"
+              @click="searchQuery = ''; searchResults = []; searchError = ''"
+              class="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+              title="Clear search"
+            >
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="h-4 w-4">
+                <line x1="18" y1="6" x2="6" y2="18"></line>
+                <line x1="6" y1="6" x2="18" y2="18"></line>
+              </svg>
+            </button>
+          </div>
+        </div>
+        <div v-if="searchError" class="px-3 pb-2 text-xs text-red-600">
+          {{ searchError }}
+        </div>
+        <div v-if="searchResults.length > 0" class="max-h-60 overflow-y-auto border-t border-gray-200">
+          <button
+            v-for="(result, idx) in searchResults"
+            :key="idx"
+            class="w-full text-left px-3 py-2 hover:bg-gray-50 text-xs text-gray-700 border-b border-gray-100"
+            @click="selectSearchResult(result)"
+          >
+            <div class="font-medium">{{ result.title }}</div>
+            <div v-if="result.address" class="text-[11px] text-gray-500">{{ result.address }}</div>
+          </button>
+        </div>
+      </div>
+    </div>
     
     <!-- Loading Spinner -->
     <div v-if="isLoading" class="absolute inset-0 flex items-center justify-center bg-white/80 backdrop-blur-sm z-50">
@@ -41,6 +88,11 @@ let platform: any = null
 let ui: any = null
 
 const isLoading = ref(true)
+const searchQuery = ref('')
+const searchResults = ref<Array<{ title: string; lat: number; lon: number; address?: string }>>([])
+const searchError = ref('')
+const isSearching = ref(false)
+const hereApiKey = import.meta.env.VITE_HERE_API_KEY || ''
 
 // Setup composables
 const callbacks: EditorCallbacks = {
@@ -140,6 +192,50 @@ function handleMapClick(coord: {lat:number, lng:number}){
     props.route.deselectAll()
     renderer.renderWaypoints()
   }
+}
+
+async function runSearch() {
+  const query = searchQuery.value.trim()
+  if (!query) return
+  if (!hereApiKey) {
+    searchError.value = 'Missing VITE_HERE_API_KEY in frontend/.env'
+    return
+  }
+
+  isSearching.value = true
+  searchError.value = ''
+  searchResults.value = []
+
+  try {
+    const url = `https://geocode.search.hereapi.com/v1/geocode?q=${encodeURIComponent(query)}&limit=5&apiKey=${hereApiKey}`
+    const response = await fetch(url)
+    if (!response.ok) {
+      throw new Error(`Search failed: ${response.status}`)
+    }
+    const data = await response.json()
+    const items = Array.isArray(data.items) ? data.items : []
+    searchResults.value = items.map((item: any) => ({
+      title: item.title || query,
+      lat: item.position?.lat,
+      lon: item.position?.lng,
+      address: item.address?.label
+    })).filter((item: any) => typeof item.lat === 'number' && typeof item.lon === 'number')
+
+    if (searchResults.value.length === 0) {
+      searchError.value = 'No results found'
+    }
+  } catch (err) {
+    console.error('Search failed:', err)
+    searchError.value = 'Search failed. Please try again.'
+  } finally {
+    isSearching.value = false
+  }
+}
+
+function selectSearchResult(result: { lat: number; lon: number }) {
+  window.dispatchEvent(new CustomEvent('map-focus', {
+    detail: { lat: result.lat, lon: result.lon, zoom: 16 }
+  }))
 }
 
 
@@ -325,5 +421,8 @@ watch(()=>props.mode, ()=>{
 </script>
 
 <style scoped>
-div { height: 100% }
+.map-root,
+.map-canvas {
+  height: 100%;
+}
 </style>
