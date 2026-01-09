@@ -323,6 +323,8 @@ async function runSim(){
     mode: simMode.value,
     speedMultiplier: simMode.value === 'demo' ? speedMultiplier.value : 1.0
   }
+
+  route.value.startSimulation(body.startSegmentIdx, body.endSegmentIdx)
   
   try {
     const response = await fetch(`${backendUrl}/sim/run`, {
@@ -334,6 +336,7 @@ async function runSim(){
     if (!response.ok) {
       const error = await response.json()
       alert(`Failed to start simulation: ${error.detail}`)
+      route.value.stopSimulation()
       return
     }
     
@@ -342,12 +345,10 @@ async function runSim(){
     if (result.state) {
       simState.value = result.state
     }
-    
-    // Start simulation tracking to lock segments
-    route.value.startSimulation(body.startSegmentIdx, body.endSegmentIdx)
   } catch (err) {
     console.error('Failed to start simulation:', err)
     alert('Failed to start simulation')
+    route.value.stopSimulation()
   }
 }
 
@@ -368,6 +369,8 @@ async function runSimFromSegment(){
     mode: simMode.value,
     speedMultiplier: simMode.value === 'demo' ? speedMultiplier.value : 1.0
   }
+
+  route.value.startSimulation(body.startSegmentIdx, body.endSegmentIdx)
   
   try {
     const response = await fetch(`${backendUrl}/sim/run`, {
@@ -379,6 +382,7 @@ async function runSimFromSegment(){
     if (!response.ok) {
       const error = await response.json()
       alert(`Failed to start simulation: ${error.detail}`)
+      route.value.stopSimulation()
       return
     }
     
@@ -387,12 +391,10 @@ async function runSimFromSegment(){
     if (result.state) {
       simState.value = result.state
     }
-    
-    // Start simulation tracking to lock segments from selected index
-    route.value.startSimulation(body.startSegmentIdx, body.endSegmentIdx)
   } catch (err) {
     console.error('Failed to start simulation:', err)
     alert('Failed to start simulation')
+    route.value.stopSimulation()
   }
 }
 
