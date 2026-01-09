@@ -31,6 +31,7 @@
         :onStop="stopSim"
         :onSelectWaypoint="onSelectWaypoint"
         :onSelectSegment="onSelectSegment"
+        :onFocusStart="focusStart"
         :onAddWaypoint="onAddWaypoint"
         :onDeleteWaypoint="onDeleteWaypoint"
         :onMoveWaypoint="onMoveWaypoint"
@@ -220,6 +221,15 @@ function onSelectWaypoint(idx:number){
 
 function onSelectSegment(idx:number){
   route.value.selectSegment(idx)
+}
+
+function focusStart(){
+  if (route.value.points.length === 0) return
+  const firstPoint = route.value.points[0]
+  const focusEvent = new CustomEvent('map-focus', {
+    detail: { lat: firstPoint.lat, lon: firstPoint.lon, zoom: 14 }
+  })
+  window.dispatchEvent(focusEvent)
 }
 
 const backendUrl = import.meta.env.VITE_API_URL || 'http://localhost:8000'

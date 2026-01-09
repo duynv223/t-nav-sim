@@ -20,6 +20,7 @@ defineProps<{
   onStop: () => void
   onSelectWaypoint: (idx: number) => void
   onSelectSegment: (idx: number) => void
+  onFocusStart: () => void
   onAddWaypoint: (p: { lat: number; lon: number }) => void
   onDeleteWaypoint: (idx: number) => void
   onMoveWaypoint: (idx: number, p: { lat: number; lon: number }) => void
@@ -46,6 +47,7 @@ defineProps<{
       :onStop="onStop"
       :onSelectWaypoint="onSelectWaypoint"
       :onSelectSegment="onSelectSegment"
+      :onFocusStart="onFocusStart"
     />
     
     <!-- Map Area -->

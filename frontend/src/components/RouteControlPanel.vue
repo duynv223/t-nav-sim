@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, watch, nextTick, computed } from 'vue'
 import { Route as MapRoute } from '@/types/route'
-import { Plus, Trash2, Play, Square, Pause, SkipForward, ChevronDown, Download, Upload } from 'lucide-vue-next'
+import { MapPinPlus, Trash2, Play, Square, Pause, SkipForward, ChevronDown, Download, Upload, LocateFixed } from 'lucide-vue-next'
 
 const props = defineProps<{
   route: MapRoute
@@ -20,6 +20,7 @@ const props = defineProps<{
   onSpeedMultiplierChange: (multiplier: number) => void
   onSelectWaypoint: (idx: number) => void
   onSelectSegment: (idx: number) => void
+  onFocusStart: () => void
 }>()
 
 const showClearConfirm = ref(false)
@@ -280,7 +281,7 @@ watch(() => props.route.segments.map(s => s.speedProfile.type), (newTypes, oldTy
             ]"
             @click="onModeChange(mode === 'add' ? 'view' : 'add')"
             :title="mode === 'add' ? 'Exit add mode (ESC)' : 'Enable add point mode - click map to add waypoints'">
-            <Plus :size="20" :class="mode === 'add' ? 'rotate-45' : ''" class="transition-transform" />
+            <MapPinPlus :size="20" :class="mode === 'add' ? 'rotate-12' : ''" class="transition-transform" />
           </button>
           
           <button 
@@ -294,6 +295,19 @@ watch(() => props.route.segments.map(s => s.speedProfile.type), (newTypes, oldTy
             ]"
             :title="route.points.length === 0 ? 'No points to clear' : 'Clear all waypoints and segments'">
             <Trash2 :size="18" />
+          </button>
+
+          <button 
+            @click="props.onFocusStart"
+            :disabled="route.points.length === 0"
+            :class="[
+              'h-10 w-10 flex items-center justify-center rounded-md transition-colors',
+              route.points.length === 0
+                ? 'bg-gray-50 text-gray-300 cursor-not-allowed'
+                : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+            ]"
+            :title="route.points.length === 0 ? 'No start point available' : 'Focus map on start point'">
+            <LocateFixed :size="18" />
           </button>
         </div>
       </div>
