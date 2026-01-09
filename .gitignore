@@ -1,0 +1,50 @@
+.bak
+
+# Python Backend
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.so
+*.egg
+*.egg-info/
+env/
+venv/
+.venv/
+ENV/
+.Python
+pip-log.txt
+pip-delete-this-directory.txt
+.pytest_cache/
+.coverage
+htmlcov/
+*.log
+
+# Frontend (Node.js/Vite)
+node_modules/
+dist/
+build/
+.vite/
+.cache/
+*.local
+.npm
+.pnpm-debug.log*
+.yarn-integrity
+.yarn-error.log*
+
+# Environment files
+.env
+.env.local
+.env.production
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# OS
+Thumbs.db
+desktop.ini

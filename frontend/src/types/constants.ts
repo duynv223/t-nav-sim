@@ -1,0 +1,53 @@
+
+export const MAP_EDITOR = {
+  PREVIEW_MARKER_SIZE: 16,
+  PREVIEW_MARKER_ANCHOR: 8,
+  PREVIEW_LINE_OPACITY: 0.5,
+  PREVIEW_LINE_DASH: [4, 4] as [number, number],
+  DRAG_LINE_OPACITY: 0.6,
+  DRAG_LINE_DASH: [4, 4] as [number, number],
+  THROTTLE_PREVIEW_MS: 16,
+  THROTTLE_DRAG_MS: 16,
+} as const
+
+export const ROUTE_RENDERER = {
+  WAYPOINT_SIZE: 16,
+  WAYPOINT_ANCHOR: 8,
+  WAYPOINT_RADIUS: 6,
+  WAYPOINT_STROKE_WIDTH: 2,
+  WAYPOINT_SELECTION_BORDER_WIDTH: 5,
+  WAYPOINT_SELECTION_BORDER_COLOR: 'rgba(244, 67, 54, 0.8)',
+  WAYPOINT_OPACITY: 0.8,
+} as const
+
+export const CAR_SIMULATION = {
+  CAR_SIZE: 48,
+  CAR_ANCHOR: 24,
+  BEARING_THRESHOLD: 15,
+  UPDATE_THROTTLE_MS: 33,
+} as const
+
+export const ROUTE_COLORS = {
+  NORMAL: '#2196F3',
+  LOCKED: '#9C27B0',
+  PREVIEW: '#999999',
+  CAR: '#FF9800',
+} as const
+
+export const ROUTE_STYLE = {
+  SEGMENT_WIDTH_NORMAL: 6,
+  SEGMENT_WIDTH_SELECTED: 8,
+  SEGMENT_SELECTION_BORDER_WIDTH: 14,
+  SEGMENT_SELECTION_BORDER_COLOR: 'rgba(117, 117, 117, 0.25)',
+  SEGMENT_OPACITY: 0.8,
+} as const
+
+export const PERFORMANCE = {
+  CANVAS_WILL_READ_FREQUENTLY: true,
+  PIXEL_RATIO: typeof window !== 'undefined' ? window.devicePixelRatio || 1 : 1,
+} as const
+
+export const MAP_CONFIG = {
+  DEFAULT_CENTER: { lat: 10.776, lng: 106.700 },
+  DEFAULT_ZOOM: 14,
+} as const
