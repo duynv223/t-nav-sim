@@ -57,7 +57,8 @@ export function useCarSimulation(
             y: CAR_SIMULATION.CAR_ANCHOR 
           } 
         },
-        volatility: true
+        volatility: true,
+        zIndex: 1000
       })
     } else {
       // Just update position, keep icon (more efficient)

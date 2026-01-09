@@ -73,7 +73,8 @@ export function useMapObjectPool(map: Ref<any>) {
       { lat: config.lat, lng: config.lng },
       { 
         icon,
-        volatility: config.volatility ?? true // Default to true for performance
+        volatility: config.volatility ?? true, // Default to true for performance
+        zIndex: config.zIndex
       }
     )
     

@@ -23,6 +23,7 @@ export interface MarkerConfig {
   iconOptions: IconOptions
   data?: Record<string, any>
   volatility?: boolean // For objects that update frequently
+  zIndex?: number
 }
 
 export interface LineStyle {
