@@ -36,11 +36,12 @@ class SimFactory:
         return RouteLiveRunner(pipeline, playback), playback
 
     def _build_pipeline(self) -> GenerationPipeline:
+        output_dir = Path(__file__).resolve().parent / "artifacts"
         return GenerationPipeline(
             MotionGenerator(),
             NmeaGenerator(),
             IqGenerator(nav_path=self._config.nav_path),
-            GenerationConfig(),
+            GenerationConfig(output_dir=str(output_dir)),
         )
 
     def _build_devices(self, dry_run: bool):

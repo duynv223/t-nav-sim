@@ -20,6 +20,7 @@ pip-delete-this-directory.txt
 htmlcov/
 *.log
 backend/output/
+backend/runtime/artifacts/
 
 # Frontend (Node.js/Vite)
 node_modules/
