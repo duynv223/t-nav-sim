@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+from pathlib import Path
 
 from runtime.adapters.dryrun_devices import DryRunGpsTransmitter, DryRunSpeedBearingDevice
 from runtime.adapters.hackrf_transmitter import HackrfTransmitter
@@ -15,7 +16,7 @@ from sim_core.player.player import MotionPlayer
 @dataclass(frozen=True)
 class SimFactoryConfig:
     serial_port: str = "COM3"
-    nav_path: str = "brdc3140.25n"
+    nav_path: str = str(Path(__file__).resolve().parent / "assets" / "brdc3140.25n")
 
 
 class SimFactory:
