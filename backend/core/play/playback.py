@@ -5,7 +5,7 @@ from core.play.player import MotionPlayer
 from core.ports import EventSink, GpsTransmitter
 
 
-class PlaybackOrchestrator:
+class PlaybackRunner:
     def __init__(
         self,
         gps: GpsTransmitter,

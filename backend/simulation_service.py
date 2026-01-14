@@ -11,9 +11,9 @@ from core.gen.iq_generator import IqGenerator
 from core.gen.motion_generator import MotionGenerator
 from core.gen.nmea_generator import NmeaGenerator
 from core.gen.pipeline import GenerationConfig, GenerationPipeline
-from core.orchestrator import RouteOrchestrator
+from core.orchestrator import RouteDemoRunner, RouteLiveRunner
 from core.play.player import MotionPlayer
-from core.play.playback import PlaybackOrchestrator
+from core.play.playback import PlaybackRunner
 from models import SimulationMode, SimulationState
 
 logger = logging.getLogger(__name__)
@@ -28,7 +28,7 @@ class SimulationService:
         self._task = None
         self._state = SimulationState.IDLE
         self._stop_requested = False
-        self._live_playback: PlaybackOrchestrator | None = None
+        self._live_playback: PlaybackRunner | None = None
 
     def client_count(self) -> int:
         return self._hub.count()
@@ -68,7 +68,7 @@ class SimulationService:
             loop = asyncio.get_running_loop()
             events = WsEventSink(lambda obj: self.publish(obj))
             self._live_playback = None
-            simulator = RouteOrchestrator(MotionGenerator(), MotionPlayer(events=events))
+            simulator = RouteDemoRunner(MotionGenerator(), MotionPlayer(events=events))
             core_route = to_core_route(route)
             if mode == SimulationMode.DEMO:
                 speed_multiplier = speed_multiplier if speed_multiplier > 0 else 10.0
@@ -100,7 +100,7 @@ class SimulationService:
 
     async def _run_demo(
         self,
-        simulator: RouteOrchestrator,
+        simulator: RouteDemoRunner,
         route,
         start_idx: int,
         end_idx: int,
@@ -131,9 +131,9 @@ class SimulationService:
     ) -> None:
         try:
             await events.on_state("preparing")
-            orchestrator, playback = self._build_live_orchestrator(events, dry_run)
+            runner, playback = self._build_live_runner(events, dry_run)
             self._live_playback = playback
-            await orchestrator.run_live(
+            await runner.run(
                 route,
                 start_idx=start_idx,
                 end_idx=end_idx,
@@ -173,11 +173,11 @@ class SimulationService:
             return dry_run
         return True
 
-    def _build_live_orchestrator(
+    def _build_live_runner(
         self,
         events: WsEventSink,
         dry_run: bool,
-    ) -> tuple[RouteOrchestrator, PlaybackOrchestrator]:
+    ) -> tuple[RouteLiveRunner, PlaybackRunner]:
         motion_gen = MotionGenerator()
         pipeline = GenerationPipeline(
             motion_gen,
@@ -193,9 +193,9 @@ class SimulationService:
             device = SerialSpeedBearingDevice(port=DEFAULT_SERIAL_PORT)
             gps = HackrfTransmitter()
         motion_player = MotionPlayer(events=events, device=device)
-        playback = PlaybackOrchestrator(gps=gps, motion_player=motion_player, events=events)
-        orchestrator = RouteOrchestrator(motion_gen, motion_player, pipeline, playback)
-        return orchestrator, playback
+        playback = PlaybackRunner(gps=gps, motion_player=motion_player, events=events)
+        runner = RouteLiveRunner(pipeline, playback)
+        return runner, playback
 
 
 def get_sim_service(app) -> SimulationService:

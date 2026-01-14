@@ -19,6 +19,7 @@ pip-delete-this-directory.txt
 .coverage
 htmlcov/
 *.log
+backend/output/
 
 # Frontend (Node.js/Vite)
 node_modules/
