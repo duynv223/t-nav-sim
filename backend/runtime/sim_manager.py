@@ -7,6 +7,7 @@ from runtime.adapters.ws_event_sink import NoClientsError, WsEventSink
 from runtime.sim_factory import SimFactory
 from runtime.sim_state import SimulationMode, SimulationState
 from sim_core.player.playback import PlaybackRunner
+from sim_core.route.models import SegmentRange
 
 logger = logging.getLogger(__name__)
 
@@ -41,8 +42,7 @@ class SimManager:
     async def run(
         self,
         route,
-        start_idx: int,
-        end_idx: int,
+        segment_range: SegmentRange | None,
         mode: SimulationMode,
         speed_multiplier: float,
         dry_run: bool | None = None,
@@ -65,8 +65,7 @@ class SimManager:
                 self._run_with_guard(
                     self._run_entrypoint(
                         route=route,
-                        start_idx=start_idx,
-                        end_idx=end_idx,
+                        segment_range=segment_range,
                         mode=mode,
                         speed_multiplier=speed_multiplier,
                         dry_run=dry_run,
@@ -116,8 +115,7 @@ class SimManager:
         self,
         *,
         route,
-        start_idx: int,
-        end_idx: int,
+        segment_range: SegmentRange | None,
         mode: SimulationMode,
         speed_multiplier: float,
         dry_run: bool | None,
@@ -133,8 +131,7 @@ class SimManager:
             simulator = self._factory.build_demo_runner(events)
             await simulator.run(
                 core_route,
-                start_idx=start_idx,
-                end_idx=end_idx,
+                segment_range=segment_range,
                 speed_multiplier=eff_speed,
             )
             return
@@ -148,8 +145,7 @@ class SimManager:
 
         await runner.run(
             core_route,
-            start_idx=start_idx,
-            end_idx=end_idx,
+            segment_range=segment_range,
             dt=LIVE_DT,
             fixed_duration_s=LIVE_FIXED_DURATION_S,
             speed_multiplier=1.0,

@@ -3,7 +3,7 @@ from sim_core.generator.motion_generator import MotionGenerator
 from sim_core.player.plan import PlaybackPlan
 from sim_core.player.player import MotionPlayer
 from sim_core.player.playback import PlaybackRunner
-from sim_core.route.models import Route
+from sim_core.route.models import Route, SegmentRange
 
 
 class RouteDemoRunner:
@@ -14,12 +14,11 @@ class RouteDemoRunner:
     async def run(
         self,
         route: Route,
-        start_idx: int = 0,
-        end_idx: int | None = None,
+        segment_range: SegmentRange | None = None,
         dt: float = 0.1,
         speed_multiplier: float = 1.0,
     ) -> None:
-        plan = self._motion_gen.generate(route, start_idx, end_idx, dt=dt)
+        plan = self._motion_gen.generate(route, segment_range, dt=dt)
         await self._player.play(plan, speed_multiplier=speed_multiplier)
 
 
@@ -35,16 +34,14 @@ class RouteLiveRunner:
     async def run(
         self,
         route: Route,
-        start_idx: int = 0,
-        end_idx: int | None = None,
+        segment_range: SegmentRange | None = None,
         dt: float = 0.1,
         fixed_duration_s: float = 60.0,
         speed_multiplier: float = 1.0,
     ) -> None:
         result = await self._generator.generate(
             route,
-            start_idx=start_idx,
-            end_idx=end_idx,
+            segment_range=segment_range,
             dt=dt,
             fixed_duration_s=fixed_duration_s,
         )

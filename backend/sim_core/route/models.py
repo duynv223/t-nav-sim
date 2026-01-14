@@ -17,6 +17,12 @@ class Segment:
 
 
 @dataclass(frozen=True)
+class SegmentRange:
+    start: int = 0
+    end: int | None = None
+
+
+@dataclass(frozen=True)
 class Route:
     route_id: str
     waypoints: list[Waypoint]

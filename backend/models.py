@@ -8,12 +8,13 @@ from app.schemas.route import (
     StopAtEndSpeedProfile,
     Waypoint,
 )
-from app.schemas.sim import SimRunRequest, SimulationMode
+from app.schemas.sim import SegmentRange, SimRunRequest, SimulationMode
 from runtime.sim_state import SimulationState
 
 __all__ = [
     "SimulationState",
     "SimulationMode",
+    "SegmentRange",
     "Waypoint",
     "ConstantSpeedProfile",
     "RampToSpeedProfile",

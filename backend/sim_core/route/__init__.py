@@ -1,4 +1,4 @@
-from sim_core.route.models import Route, Segment, Waypoint
+from sim_core.route.models import Route, Segment, SegmentRange, Waypoint
 from sim_core.route.profiles import (
     SpeedProfile,
     ConstantSpeedProfile,
@@ -10,6 +10,7 @@ from sim_core.route.profiles import (
 __all__ = [
     "Route",
     "Segment",
+    "SegmentRange",
     "Waypoint",
     "SpeedProfile",
     "ConstantSpeedProfile",

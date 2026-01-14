@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from sim_core.generator.motion import MotionPlan, MotionPoint
 from sim_core.route.geo import bearing_degrees, haversine_meters
-from sim_core.route.models import Route
+from sim_core.route.models import Route, SegmentRange
 from sim_core.route.profiles import StopAtEndSpeedProfile
 
 
@@ -14,14 +14,15 @@ class MotionGenerator:
     def generate(
         self,
         route: Route,
-        start_idx: int = 0,
-        end_idx: int | None = None,
+        segment_range: SegmentRange | None = None,
         dt: float | None = None,
     ) -> MotionPlan:
         if not route.segments:
             return MotionPlan(points=[])
-        if end_idx is None:
-            end_idx = len(route.segments) - 1
+        start = segment_range.start if segment_range is not None else 0
+        end = segment_range.end if segment_range is not None else None
+        if end is None:
+            end = len(route.segments) - 1
         dt = dt if dt is not None else self._dt_default
         dt = max(0.001, dt)
 
@@ -29,7 +30,7 @@ class MotionGenerator:
         prev_segment_end_speed = 0.0
         t_cursor = 0.0
 
-        for seg_idx in range(start_idx, end_idx + 1):
+        for seg_idx in range(start, end + 1):
             seg = route.segments[seg_idx]
             wp_from = route.waypoints[seg.from_idx]
             wp_to = route.waypoints[seg.to_idx]

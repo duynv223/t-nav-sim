@@ -7,7 +7,7 @@ from sim_core.generator.artifacts import GenerationResult
 from sim_core.generator.iq_generator import IqGenerator
 from sim_core.generator.motion_generator import MotionGenerator
 from sim_core.generator.nmea_generator import NmeaGenerator
-from sim_core.route.models import Route
+from sim_core.route.models import Route, SegmentRange
 
 
 @dataclass(frozen=True)
@@ -32,17 +32,19 @@ class GenerationPipeline:
     async def generate(
         self,
         route: Route,
-        start_idx: int = 0,
-        end_idx: int | None = None,
+        segment_range: SegmentRange | None = None,
         dt: float = 0.1,
         fixed_duration_s: float = 60.0,
     ) -> GenerationResult:
         if not route.segments:
             raise ValueError("Route has no segments")
-        if end_idx is None:
-            end_idx = len(route.segments) - 1
 
-        plan = self._motion_gen.generate(route, start_idx, end_idx, dt=dt)
+        start = segment_range.start if segment_range is not None else 0
+        end = segment_range.end if segment_range is not None else None
+        if end is None:
+            end = len(route.segments) - 1
+
+        plan = self._motion_gen.generate(route, segment_range, dt=dt)
 
         output_dir = Path(self._config.output_dir)
         output_dir.mkdir(parents=True, exist_ok=True)
@@ -54,7 +56,7 @@ class GenerationPipeline:
         iq_fixed_path = output_dir / f"{route_tag}_fixed.iq"
 
         self._nmea_gen.generate(plan, str(nmea_route_path))
-        start_wp = route.waypoints[route.segments[start_idx].from_idx]
+        start_wp = route.waypoints[route.segments[start].from_idx]
         self._nmea_gen.generate_fixed(
             start_wp.lat,
             start_wp.lon,

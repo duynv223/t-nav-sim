@@ -317,14 +317,17 @@ async function runSim(){
   // Ensure route is synced before running
   await syncRouteToBackend()
   
+  const segmentRange = {
+    start: 0,
+    end: null // Run all segments
+  }
   const body = {
-    startSegmentIdx: 0,
-    endSegmentIdx: null, // Run all segments
+    segmentRange,
     mode: simMode.value,
     speedMultiplier: simMode.value === 'demo' ? speedMultiplier.value : 1.0
   }
 
-  route.value.startSimulation(body.startSegmentIdx, body.endSegmentIdx)
+  route.value.startSimulation(segmentRange.start, segmentRange.end)
   
   try {
     const response = await fetch(`${backendUrl}/sim/run`, {
@@ -363,14 +366,17 @@ async function runSimFromSegment(){
   // Ensure route is synced before running
   await syncRouteToBackend()
   
+  const segmentRange = {
+    start: selectedIdx,
+    end: null // Run to the end
+  }
   const body = {
-    startSegmentIdx: selectedIdx,
-    endSegmentIdx: null, // Run to the end
+    segmentRange,
     mode: simMode.value,
     speedMultiplier: simMode.value === 'demo' ? speedMultiplier.value : 1.0
   }
 
-  route.value.startSimulation(body.startSegmentIdx, body.endSegmentIdx)
+  route.value.startSimulation(segmentRange.start, segmentRange.end)
   
   try {
     const response = await fetch(`${backendUrl}/sim/run`, {
