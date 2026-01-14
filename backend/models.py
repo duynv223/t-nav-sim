@@ -100,3 +100,4 @@ class SimRunRequest(BaseModel):
     endSegmentIdx: int | None = None
     mode: SimulationMode = SimulationMode.DEMO
     speedMultiplier: float = 1.0
+    dryRun: bool | None = None

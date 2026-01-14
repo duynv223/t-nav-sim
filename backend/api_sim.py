@@ -27,7 +27,7 @@ async def sim_run(req: SimRunRequest, request: Request):
         raise HTTPException(status_code=400, detail=f"Invalid endSegmentIdx: {end_idx}")
     try:
         mode_str, speed_multiplier = await service.run(
-            active_route, req.startSegmentIdx, end_idx, req.mode, req.speedMultiplier
+            active_route, req.startSegmentIdx, end_idx, req.mode, req.speedMultiplier, req.dryRun
         )
     except RuntimeError:
         raise HTTPException(status_code=400, detail="Simulation already running")
