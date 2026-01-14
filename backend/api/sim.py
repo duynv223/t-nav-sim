@@ -1,6 +1,6 @@
 from fastapi import APIRouter, HTTPException, Request
 from models import SimRunRequest, SimulationState, SimulationMode
-from simulation_service import get_sim_service
+from services.simulation_service import get_sim_service
 import logging
 
 logger = logging.getLogger(__name__)

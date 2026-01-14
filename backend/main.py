@@ -1,9 +1,9 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 import logging
-from api_route import router as route_router
-from api_sim import router as sim_router
-from api_ws import router as ws_router
+from api.route import router as route_router
+from api.sim import router as sim_router
+from api.ws import router as ws_router
 
 logging.basicConfig(
     level=logging.INFO,
