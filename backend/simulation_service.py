@@ -1,54 +1,43 @@
 import asyncio
 import logging
+from typing import Awaitable
 
-from adapters.dryrun_devices import DryRunGpsTransmitter, DryRunSpeedBearingDevice
-from adapters.hackrf_transmitter import HackrfTransmitter
 from adapters.route_mapper import to_core_route
-from adapters.serial_speed_bearing import SerialSpeedBearingDevice
 from adapters.ws_event_sink import NoClientsError, WsEventSink
 from client_hub import get_client_hub
-from core.gen.iq_generator import IqGenerator
-from core.gen.motion_generator import MotionGenerator
-from core.gen.nmea_generator import NmeaGenerator
-from core.gen.pipeline import GenerationConfig, GenerationPipeline
-from core.orchestrator import RouteDemoRunner, RouteLiveRunner
-from core.play.player import MotionPlayer
 from core.play.playback import PlaybackRunner
+from factories.sim_factory import SimFactory
 from models import SimulationMode, SimulationState
 
 logger = logging.getLogger(__name__)
 
-DEFAULT_SERIAL_PORT = "COM3"
+DEMO_SPEED_MULTIPLIER_DEFAULT = 10.0
+LIVE_DT = 0.1
+LIVE_FIXED_DURATION_S = 60.0
 
 
 class SimulationService:
-    def __init__(self, hub):
+    def __init__(self, hub, factory: SimFactory | None = None):
         self._hub = hub
+        self._factory = factory or SimFactory()
+
         self._lock = asyncio.Lock()
-        self._task = None
+        self._task: asyncio.Task[None] | None = None
+
         self._state = SimulationState.IDLE
         self._stop_requested = False
+
+        # Only used for graceful stop() before task cancellation
         self._live_playback: PlaybackRunner | None = None
 
+    # -----------------------------
+    # Public API
+    # -----------------------------
     def client_count(self) -> int:
         return self._hub.count()
 
     def get_state(self) -> SimulationState:
         return self._state
-
-    async def _set_state(self, state: SimulationState) -> None:
-        self._state = state
-        payload = {
-            "type": "state",
-            "state": state.value
-        }
-        await self.publish(payload)
-        logger.info(f"Simulation state changed to: {state.value}")
-
-    async def publish(self, payload: dict) -> bool:
-        topic = payload.get("type") if isinstance(payload, dict) else None
-        sent = await self._hub.publish(payload, topic=topic)
-        return sent > 0
 
     async def run(
         self,
@@ -58,148 +47,191 @@ class SimulationService:
         mode: SimulationMode,
         speed_multiplier: float,
         dry_run: bool | None = None,
-    ):
+    ) -> tuple[str, float]:
+        """
+        Start a new simulation run.
+        - Spawns a single background task that owns simulator lifecycle.
+        - Returns a user-friendly mode string and effective speed multiplier.
+        """
         async with self._lock:
-            if self._task is not None and not self._task.done():
-                logger.warning("Attempted to start simulation while one is already running")
-                raise RuntimeError("Simulation already running")
+            self._ensure_not_running()
+
             self._stop_requested = False
-            await self._set_state(SimulationState.RUNNING)
-            loop = asyncio.get_running_loop()
-            events = WsEventSink(lambda obj: self.publish(obj))
             self._live_playback = None
-            simulator = RouteDemoRunner(MotionGenerator(), MotionPlayer(events=events))
-            core_route = to_core_route(route)
-            if mode == SimulationMode.DEMO:
-                speed_multiplier = speed_multiplier if speed_multiplier > 0 else 10.0
-                task = loop.create_task(
-                    self._run_demo(
-                        simulator,
-                        core_route,
-                        start_idx,
-                        end_idx,
-                        speed_multiplier,
+            await self._set_state(SimulationState.RUNNING)
+
+            mode_str, eff_speed = self._describe_run(mode, speed_multiplier)
+
+            self._task = asyncio.create_task(
+                self._run_with_guard(
+                    self._run_entrypoint(
+                        route=route,
+                        start_idx=start_idx,
+                        end_idx=end_idx,
+                        mode=mode,
+                        speed_multiplier=speed_multiplier,
+                        dry_run=dry_run,
                     )
                 )
-                self._task = task
-                mode_str = f"DEMO (x{speed_multiplier})"
-            else:
-                speed_multiplier = 1.0
-                task = loop.create_task(
-                    self._run_live(
-                        core_route,
-                        start_idx,
-                        end_idx,
-                        events,
-                        self._resolve_dry_run(dry_run),
-                    )
-                )
-                self._task = task
-                mode_str = "LIVE"
-        return mode_str, speed_multiplier
-
-    async def _run_demo(
-        self,
-        simulator: RouteDemoRunner,
-        route,
-        start_idx: int,
-        end_idx: int,
-        speed_multiplier: float,
-    ) -> None:
-        try:
-            await simulator.run_demo(
-                route,
-                start_idx=start_idx,
-                end_idx=end_idx,
-                speed_multiplier=speed_multiplier,
             )
-        except NoClientsError:
-            logger.warning("All WebSocket clients disconnected. Stopping simulation.")
-        except asyncio.CancelledError:
-            raise
-        finally:
-            if not self._stop_requested and self._state == SimulationState.RUNNING:
-                await self._set_state(SimulationState.IDLE)
 
-    async def _run_live(
-        self,
-        route,
-        start_idx: int,
-        end_idx: int,
-        events: WsEventSink,
-        dry_run: bool,
-    ) -> None:
-        try:
-            await events.on_state("preparing")
-            runner, playback = self._build_live_runner(events, dry_run)
-            self._live_playback = playback
-            await runner.run(
-                route,
-                start_idx=start_idx,
-                end_idx=end_idx,
-                dt=0.1,
-                fixed_duration_s=60.0,
-                speed_multiplier=1.0,
-            )
-        except NoClientsError:
-            logger.warning("All WebSocket clients disconnected. Stopping simulation.")
-        except asyncio.CancelledError:
-            raise
-        finally:
-            print("Live simulation ended")
-            if not self._stop_requested and self._state == SimulationState.RUNNING:
-                await self._set_state(SimulationState.IDLE)
+            return mode_str, eff_speed
 
     async def stop(self) -> SimulationState:
+        """
+        Stop the currently running simulation (if any).
+        - Gracefully stops live playback if available
+        - Cancels the background task
+        - Sets state STOPPED
+        """
         async with self._lock:
-            if self._task is None or self._task.done():
+            if not self._task or self._task.done():
                 logger.info("Stop requested but no simulation running")
                 await self._set_state(SimulationState.IDLE)
                 return self._state
+
             self._stop_requested = True
+
+            # Graceful stop for LIVE playback (if started)
             if self._live_playback is not None:
-                await self._live_playback.stop()
+                try:
+                    await self._live_playback.stop()
+                except Exception:
+                    logger.exception("Failed to stop live playback gracefully")
+
             self._task.cancel()
             try:
                 await self._task
             except asyncio.CancelledError:
-                logger.info("Simulation Stopped (manually)")
+                logger.info("Simulation stopped (manually)")
+
             self._task = None
+            self._live_playback = None
             await self._set_state(SimulationState.STOPPED)
             return self._state
 
-    def _resolve_dry_run(self, dry_run: bool | None) -> bool:
-        if dry_run is not None:
-            return dry_run
-        return True
-
-    def _build_live_runner(
+    # -----------------------------
+    # Core worker (task entrypoint)
+    # -----------------------------
+    async def _run_entrypoint(
         self,
-        events: WsEventSink,
-        dry_run: bool,
-    ) -> tuple[RouteLiveRunner, PlaybackRunner]:
-        motion_gen = MotionGenerator()
-        pipeline = GenerationPipeline(
-            motion_gen,
-            NmeaGenerator(),
-            IqGenerator(),
-            GenerationConfig(),
+        *,
+        route,
+        start_idx: int,
+        end_idx: int,
+        mode: SimulationMode,
+        speed_multiplier: float,
+        dry_run: bool | None,
+    ) -> None:
+        """
+        Runs inside background task. Owns simulator creation + execution.
+        """
+        events = WsEventSink(self.publish)
+        core_route = to_core_route(route)
+
+        if mode == SimulationMode.DEMO:
+            eff_speed = self._normalize_speed_multiplier(speed_multiplier)
+            simulator = self._factory.build_demo_runner(events)
+            await simulator.run(
+                core_route,
+                start_idx=start_idx,
+                end_idx=end_idx,
+                speed_multiplier=eff_speed,
+            )
+            return
+
+        # LIVE
+        await events.on_state("preparing")
+        resolved_dry_run = self._dry_run_or_default(dry_run)
+
+        runner, playback = self._factory.build_live_runner(events, resolved_dry_run)
+        self._live_playback = playback
+
+        await runner.run(
+            core_route,
+            start_idx=start_idx,
+            end_idx=end_idx,
+            dt=LIVE_DT,
+            fixed_duration_s=LIVE_FIXED_DURATION_S,
+            speed_multiplier=1.0,
         )
 
-        if dry_run:
-            gps = DryRunGpsTransmitter()
-            device = DryRunSpeedBearingDevice()
-        else:
-            device = SerialSpeedBearingDevice(port=DEFAULT_SERIAL_PORT)
-            gps = HackrfTransmitter()
-        motion_player = MotionPlayer(events=events, device=device)
-        playback = PlaybackRunner(gps=gps, motion_player=motion_player, events=events)
-        runner = RouteLiveRunner(pipeline, playback)
-        return runner, playback
+    # -----------------------------
+    # Guard / lifecycle
+    # -----------------------------
+    async def _run_with_guard(self, work: Awaitable[None]) -> None:
+        try:
+            await work
+        except NoClientsError:
+            logger.warning("All WebSocket clients disconnected. Stopping simulation.")
+        except asyncio.CancelledError:
+            raise
+        except Exception:
+            logger.exception("Simulation crashed")
+        finally:
+            await self._cleanup_after_task()
+
+    async def _cleanup_after_task(self) -> None:
+        """
+        Cleanup that must always happen at the end of the background task.
+        Ensures playback is stopped and state is finalized.
+        """
+        # Ensure playback is stopped (defensive)
+        if self._live_playback is not None:
+            try:
+                await self._live_playback.stop()
+            except Exception:
+                logger.exception("Failed to stop live playback in cleanup")
+            finally:
+                self._live_playback = None
+
+        await self._finalize_run()
+
+    async def _finalize_run(self) -> None:
+        """
+        If run completed naturally (not manually stopped), transition RUNNING -> IDLE.
+        """
+        if not self._stop_requested and self._state == SimulationState.RUNNING:
+            await self._set_state(SimulationState.IDLE)
+
+    def _ensure_not_running(self) -> None:
+        if self._task and not self._task.done():
+            logger.warning("Attempted to start simulation while one is already running")
+            raise RuntimeError("Simulation already running")
+
+    # -----------------------------
+    # Publish + state
+    # -----------------------------
+    async def publish(self, payload: dict) -> bool:
+        topic = payload.get("type")
+        return (await self._hub.publish(payload, topic=topic)) > 0
+
+    async def _set_state(self, state: SimulationState) -> None:
+        self._state = state
+        try:
+            await self.publish({"type": "state", "state": state.value})
+        except Exception:
+            logger.exception("Failed to publish state update")
+        logger.info("Simulation state changed to: %s", state.value)
+
+    # -----------------------------
+    # Small helpers
+    # -----------------------------
+    def _dry_run_or_default(self, dry_run: bool | None) -> bool:
+        return True if dry_run is None else dry_run
+
+    def _normalize_speed_multiplier(self, speed_multiplier: float) -> float:
+        return speed_multiplier if speed_multiplier > 0 else DEMO_SPEED_MULTIPLIER_DEFAULT
+
+    def _describe_run(self, mode: SimulationMode, speed_multiplier: float) -> tuple[str, float]:
+        if mode == SimulationMode.DEMO:
+            eff_speed = self._normalize_speed_multiplier(speed_multiplier)
+            return f"DEMO (x{eff_speed})", eff_speed
+        return "LIVE", 1.0
 
 
 def get_sim_service(app) -> SimulationService:
-    if not hasattr(app.state, "sim_service") or app.state.sim_service is None:
+    if not getattr(app.state, "sim_service", None):
         hub = get_client_hub(app)
         app.state.sim_service = SimulationService(hub)
     return app.state.sim_service

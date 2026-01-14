@@ -10,9 +10,17 @@ logger = logging.getLogger(__name__)
 
 
 class IqGenerator:
-    def __init__(self, command: str = "gps-sdr-sim", extra_args: Iterable[str] | None = None):
+    def __init__(
+        self,
+        command: str = "gps-sdr-sim",
+        nav_path: str = "brdc3140.25n",
+        extra_args: Iterable[str] | None = None,
+    ):
         self._command = command
+        self._nav_path = nav_path
         self._extra_args = list(extra_args) if extra_args else []
+        if not self._nav_path:
+            raise ValueError("nav_path is required for gps-sdr-sim")
 
     async def generate(
         self,
@@ -25,6 +33,8 @@ class IqGenerator:
         out_file.parent.mkdir(parents=True, exist_ok=True)
         cmd = shlex.split(self._command) + [
             "-e",
+            str(self._nav_path),
+            "-u",
             str(nmea_path),
             "-o",
             str(out_file),
