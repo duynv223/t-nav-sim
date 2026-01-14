@@ -46,11 +46,10 @@ class SimManager:
         mode: SimulationMode,
         speed_multiplier: float,
         dry_run: bool | None = None,
-    ) -> tuple[str, float]:
+    ) -> None:
         """
         Start a new simulation run.
         - Spawns a single background task that owns simulator lifecycle.
-        - Returns a user-friendly mode string and effective speed multiplier.
         """
         async with self._lock:
             self._ensure_not_running()
@@ -58,8 +57,6 @@ class SimManager:
             self._stop_requested = False
             self._live_playback = None
             await self._set_state(SimulationState.RUNNING)
-
-            mode_str, eff_speed = self._describe_run(mode, speed_multiplier)
 
             self._task = asyncio.create_task(
                 self._run_with_guard(
@@ -72,8 +69,6 @@ class SimManager:
                     )
                 )
             )
-
-            return mode_str, eff_speed
 
     async def stop(self) -> SimulationState:
         """
@@ -217,11 +212,5 @@ class SimManager:
 
     def _normalize_speed_multiplier(self, speed_multiplier: float) -> float:
         return speed_multiplier if speed_multiplier > 0 else DEMO_SPEED_MULTIPLIER_DEFAULT
-
-    def _describe_run(self, mode: SimulationMode, speed_multiplier: float) -> tuple[str, float]:
-        if mode == SimulationMode.DEMO:
-            eff_speed = self._normalize_speed_multiplier(speed_multiplier)
-            return f"DEMO (x{eff_speed})", eff_speed
-        return "LIVE", 1.0
 
 

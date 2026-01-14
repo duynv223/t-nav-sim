@@ -31,7 +31,7 @@ async def sim_run(req: SimRunRequest, request: Request):
         logger.warning(f"Invalid segmentRange.end: {end}")
         raise HTTPException(status_code=400, detail=f"Invalid segmentRange.end: {end}")
     try:
-        mode_str, speed_multiplier = await service.run(
+        await service.run(
             active_route,
             SegmentRange(start=start, end=end),
             req.mode,
@@ -42,7 +42,7 @@ async def sim_run(req: SimRunRequest, request: Request):
         raise HTTPException(status_code=400, detail="Simulation already running")
     logger.info(
         "Simulation Started [%s]: %s | Segments %s-%s (%s) | %s clients",
-        mode_str,
+        req.mode.value,
         active_route.routeId,
         start,
         end,
@@ -58,7 +58,6 @@ async def sim_run(req: SimRunRequest, request: Request):
             "end": end,
         },
         "mode": req.mode.value,
-        "speedMultiplier": speed_multiplier,
     }
 
 @router.post("/sim/stop")
