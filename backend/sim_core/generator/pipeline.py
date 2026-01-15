@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+import csv
 from pathlib import Path
 
 from sim_core.generator.artifacts import GenerationResult
@@ -50,11 +51,13 @@ class GenerationPipeline:
         output_dir.mkdir(parents=True, exist_ok=True)
         # Example: route_id "Hanoi - QL1A #1" -> safe name "Hanoi_-_QL1A__1"
         route_tag = _safe_name(route.route_id)
+        motion_path = output_dir / f"{route_tag}_motion.csv"
         nmea_route_path = output_dir / f"{route_tag}_route.nmea"
         nmea_fixed_path = output_dir / f"{route_tag}_fixed.nmea"
         iq_route_path = output_dir / f"{route_tag}_route.iq"
         iq_fixed_path = output_dir / f"{route_tag}_fixed.iq"
 
+        _write_motion_csv(plan, motion_path)
         self._nmea_gen.generate(plan, str(nmea_route_path))
         start_wp = route.waypoints[route.segments[start].from_idx]
         self._nmea_gen.generate_fixed(
@@ -79,6 +82,7 @@ class GenerationPipeline:
 
         return GenerationResult(
             motion=plan,
+            motion_path=str(motion_path),
             nmea_route_path=str(nmea_route_path),
             nmea_fixed_path=str(nmea_fixed_path),
             iq_route_path=str(iq_route_path),
@@ -91,4 +95,32 @@ def _safe_name(route_id: str) -> str:
     # Keep only [A-Za-z0-9_-] for filenames; others become "_" to avoid filesystem issues.
     cleaned = "".join(ch if ch.isalnum() or ch in ("-", "_") else "_" for ch in route_id.strip())
     return cleaned or "route"
+
+
+def _write_motion_csv(plan, path: Path) -> None:
+    with path.open("w", encoding="utf-8", newline="") as handle:
+        writer = csv.writer(handle)
+        writer.writerow(
+            [
+                "t",
+                "lat",
+                "lon",
+                "speed_mps",
+                "bearing_deg",
+                "segment_idx",
+                "segment_progress",
+            ]
+        )
+        for point in plan.points:
+            writer.writerow(
+                [
+                    f"{point.t:.3f}",
+                    f"{point.lat:.7f}",
+                    f"{point.lon:.7f}",
+                    f"{point.speed_mps:.3f}",
+                    f"{point.bearing_deg:.2f}",
+                    str(point.segment_idx),
+                    f"{point.segment_progress:.4f}",
+                ]
+            )
 
