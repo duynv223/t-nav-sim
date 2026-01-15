@@ -28,6 +28,7 @@ const showClearConfirm = ref(false)
 const isPointsCollapsed = ref(true)
 const isSegmentsCollapsed = ref(false)
 const fileInputRef = ref<HTMLInputElement | null>(null)
+const activeTab = ref<'route' | 'simulation'>('route')
 
 // Check if a segment is selected
 const hasSelectedSegment = computed(() => {
@@ -224,8 +225,35 @@ watch(() => props.route.segments.map(s => s.speedProfile.type), (newTypes, oldTy
 
 <template>
   <div class="flex flex-col h-full w-80 border-r border-gray-200 bg-white">
+    <div class="border-b border-gray-200 bg-gray-50 p-2">
+      <div class="flex gap-2">
+        <button
+          @click="activeTab = 'route'"
+          :class="[
+            'flex-1 px-3 py-2 text-xs font-semibold rounded-md transition-colors',
+            activeTab === 'route'
+              ? 'bg-white text-gray-900 border border-gray-200 shadow-sm'
+              : 'bg-transparent text-gray-500 hover:text-gray-700'
+          ]"
+        >
+          Route Edit
+        </button>
+        <button
+          @click="activeTab = 'simulation'"
+          :class="[
+            'flex-1 px-3 py-2 text-xs font-semibold rounded-md transition-colors',
+            activeTab === 'simulation'
+              ? 'bg-white text-gray-900 border border-gray-200 shadow-sm'
+              : 'bg-transparent text-gray-500 hover:text-gray-700'
+          ]"
+        >
+          Simulation
+        </button>
+      </div>
+    </div>
 
     <div class="flex-1 overflow-y-auto">
+      <div v-show="activeTab === 'route'">
       <!-- Route File Management Section -->
       <div class="p-4 border-b border-gray-200 bg-gray-50">
         <div class="flex items-center justify-between mb-2">
@@ -480,6 +508,9 @@ watch(() => props.route.segments.map(s => s.speedProfile.type), (newTypes, oldTy
         </div>
       </div>
 
+      </div>
+
+      <div v-show="activeTab === 'simulation'">
       <!-- Simulation Control Section -->
       <div class="p-4 border-b border-gray-200">
         <h4 class="text-sm font-semibold text-gray-900 mb-3 flex items-center gap-2">
@@ -654,10 +685,11 @@ watch(() => props.route.segments.map(s => s.speedProfile.type), (newTypes, oldTy
             <span class="font-mono">{{ live.bearing ?? '-' }}</span>
           </div>
         </div>
+        </div>
       </div>
-    </div>
-    
-    <!-- Clear Confirmation Modal -->
+      </div>
+      
+      <!-- Clear Confirmation Modal -->
     <div v-if="showClearConfirm" class="absolute inset-0 bg-black/50 flex items-center justify-center z-50" @click="cancelClear">
       <div class="bg-white rounded-lg shadow-xl p-6 m-4 max-w-sm w-full" @click.stop>
         <h3 class="text-lg font-semibold text-gray-900 mb-2">Clear All Points?</h3>
