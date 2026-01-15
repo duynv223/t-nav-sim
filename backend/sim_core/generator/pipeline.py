@@ -71,7 +71,7 @@ class GenerationPipeline:
         await self._iq_gen.generate_static(
             start_wp.lat,
             start_wp.lon,
-            0.0,
+            15.0,
             str(iq_fixed_path),
             sample_rate_hz=self._config.sample_rate_hz,
             duration_s=fixed_duration_s,

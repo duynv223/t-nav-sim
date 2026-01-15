@@ -15,8 +15,8 @@ class HackrfTransmitter(GpsTransmitter):
         command: str = "hackrf_transfer",
         freq_hz: int = 1575420000,
         sample_rate_hz: int = 2600000,
-        txvga: int = 20,
-        amp: bool = False,
+        txvga: int = 47,
+        amp: bool = True,
     ):
         self._command = command
         self._freq_hz = freq_hz

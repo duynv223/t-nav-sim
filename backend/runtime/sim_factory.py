@@ -1,6 +1,7 @@
 from dataclasses import dataclass
 from pathlib import Path
 
+import logging
 from runtime.adapters.dryrun_devices import DryRunGpsTransmitter, DryRunSpeedBearingDevice
 from runtime.adapters.hackrf_transmitter import HackrfTransmitter
 from runtime.adapters.null_devices import NullGpsTransmitter, NullSpeedBearingDevice
@@ -14,10 +15,12 @@ from sim_core.player.playback import PlaybackRunner
 from sim_core.player.player import MotionPlayer
 
 
+logger = logging.getLogger(__name__)
+
 @dataclass(frozen=True)
 class SimFactoryConfig:
     serial_port: str = "COM3"
-    nav_path: str = str(Path(__file__).resolve().parent / "assets" / "brdc3140.25n")
+    nav_path: str = str(Path(__file__).resolve().parent / "assets" / "brdc0010.22n")
 
 
 class SimFactory:
@@ -52,6 +55,12 @@ class SimFactory:
         )
 
     def _build_devices(self, dry_run: bool, enable_gps: bool, enable_motion: bool):
+        logger.info(
+            "Building devices: dry_run=%s enable_gps=%s enable_motion=%s",
+            dry_run,
+            enable_gps,
+            enable_motion,
+        )
         gps: HackrfTransmitter | DryRunGpsTransmitter | NullGpsTransmitter
         device: SerialSpeedBearingDevice | DryRunSpeedBearingDevice | NullSpeedBearingDevice
 

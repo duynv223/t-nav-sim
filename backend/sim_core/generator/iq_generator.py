@@ -13,7 +13,7 @@ class IqGenerator:
     def __init__(
         self,
         command: str = "gps-sdr-sim",
-        nav_path: str = "brdc3140.25n",
+        nav_path: str = "brdc0010.22n",
         extra_args: Iterable[str] | None = None,
     ):
         self._command = command
@@ -45,6 +45,12 @@ class IqGenerator:
             str(out_path),
             "-s",
             str(sample_rate_hz),
+            "-b",
+            "8",
+            "-t",
+            "2026/01/15,08:00:00",
+            "-T",
+            "2026/01/15,08:00:00"
         ]
         return await self._run(cmd, out_path, duration_s=duration_s)
 
@@ -74,6 +80,12 @@ class IqGenerator:
             str(out_path),
             "-s",
             str(sample_rate_hz),
+            "-b",
+            "8",
+            "-t",
+            "2026/01/15,08:00:00",
+            "-T",
+            "2026/01/15,08:00:00"
         ]
         return await self._run(cmd, out_path, duration_s=duration_s)
 
