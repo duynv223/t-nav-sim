@@ -3,6 +3,7 @@ from pathlib import Path
 
 from runtime.adapters.dryrun_devices import DryRunGpsTransmitter, DryRunSpeedBearingDevice
 from runtime.adapters.hackrf_transmitter import HackrfTransmitter
+from runtime.adapters.null_devices import NullGpsTransmitter, NullSpeedBearingDevice
 from runtime.adapters.serial_speed_bearing import SerialSpeedBearingDevice
 from sim_core.generator.iq_generator import IqGenerator
 from sim_core.generator.motion_generator import MotionGenerator
@@ -28,9 +29,15 @@ class SimFactory:
         motion_player = MotionPlayer(events=events)
         return RouteDemoRunner(motion_gen, motion_player)
 
-    def build_live_runner(self, events, dry_run: bool) -> tuple[RouteLiveRunner, PlaybackRunner]:
+    def build_live_runner(
+        self,
+        events,
+        dry_run: bool,
+        enable_gps: bool = True,
+        enable_motion: bool = True,
+    ) -> tuple[RouteLiveRunner, PlaybackRunner]:
         gen_pipeline = self._build_generation_pipeline()
-        gps, device = self._build_devices(dry_run)
+        gps, device = self._build_devices(dry_run, enable_gps, enable_motion)
         motion_player = MotionPlayer(events=events, device=device)
         playback = PlaybackRunner(gps=gps, motion_player=motion_player, events=events)
         return RouteLiveRunner(gen_pipeline, playback), playback
@@ -44,11 +51,22 @@ class SimFactory:
             GenerationConfig(output_dir=str(output_dir)),
         )
 
-    def _build_devices(self, dry_run: bool):
-        if dry_run:
+    def _build_devices(self, dry_run: bool, enable_gps: bool, enable_motion: bool):
+        gps: HackrfTransmitter | DryRunGpsTransmitter | NullGpsTransmitter
+        device: SerialSpeedBearingDevice | DryRunSpeedBearingDevice | NullSpeedBearingDevice
+
+        if not enable_gps:
+            gps = NullGpsTransmitter()
+        elif dry_run:
             gps = DryRunGpsTransmitter()
+        else:
+            gps = HackrfTransmitter()
+
+        if not enable_motion:
+            device = NullSpeedBearingDevice()
+        elif dry_run:
             device = DryRunSpeedBearingDevice()
-            return gps, device
-        device = SerialSpeedBearingDevice(port=self._config.serial_port)
-        gps = HackrfTransmitter()
+        else:
+            device = SerialSpeedBearingDevice(port=self._config.serial_port)
+
         return gps, device

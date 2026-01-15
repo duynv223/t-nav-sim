@@ -37,6 +37,8 @@ async def sim_run(req: SimRunRequest, request: Request):
             req.mode,
             req.speedMultiplier,
             req.dryRun,
+            req.enableGps,
+            req.enableMotion,
         )
     except RuntimeError:
         raise HTTPException(status_code=400, detail="Simulation already running")

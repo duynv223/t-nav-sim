@@ -46,6 +46,8 @@ class SimManager:
         mode: SimulationMode,
         speed_multiplier: float,
         dry_run: bool | None = None,
+        enable_gps: bool | None = None,
+        enable_motion: bool | None = None,
     ) -> None:
         """
         Start a new simulation run.
@@ -66,6 +68,8 @@ class SimManager:
                         mode=mode,
                         speed_multiplier=speed_multiplier,
                         dry_run=dry_run,
+                        enable_gps=enable_gps,
+                        enable_motion=enable_motion,
                     )
                 )
             )
@@ -114,6 +118,8 @@ class SimManager:
         mode: SimulationMode,
         speed_multiplier: float,
         dry_run: bool | None,
+        enable_gps: bool | None,
+        enable_motion: bool | None,
     ) -> None:
         """
         Runs inside background task. Owns simulator creation + execution.
@@ -134,8 +140,15 @@ class SimManager:
         # LIVE
         await events.on_state("preparing")
         resolved_dry_run = self._dry_run_or_default(dry_run)
+        resolved_enable_gps = self._enable_or_default(enable_gps)
+        resolved_enable_motion = self._enable_or_default(enable_motion)
 
-        runner, playback = self._factory.build_live_runner(events, resolved_dry_run)
+        runner, playback = self._factory.build_live_runner(
+            events,
+            resolved_dry_run,
+            enable_gps=resolved_enable_gps,
+            enable_motion=resolved_enable_motion,
+        )
         self._live_playback = playback
 
         await runner.run(
@@ -209,6 +222,9 @@ class SimManager:
     # -----------------------------
     def _dry_run_or_default(self, dry_run: bool | None) -> bool:
         return True if dry_run is None else dry_run
+
+    def _enable_or_default(self, flag: bool | None) -> bool:
+        return True if flag is None else flag
 
     def _normalize_speed_multiplier(self, speed_multiplier: float) -> float:
         return speed_multiplier if speed_multiplier > 0 else DEMO_SPEED_MULTIPLIER_DEFAULT

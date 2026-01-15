@@ -13,3 +13,5 @@ class SimRunRequest(BaseModel):
     mode: SimulationMode = SimulationMode.DEMO
     speedMultiplier: float = 1.0
     dryRun: bool | None = None
+    enableGps: bool | None = None
+    enableMotion: bool | None = None
