@@ -1,28 +1,10 @@
-import logging
-
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.router import router as api_router
+from app.core.logging import configure_logging
 
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s %(name)-15s %(levelname)-5s %(message)s',
-    datefmt='%H:%M:%S'
-)
-logger = logging.getLogger(__name__)
-
-for logger_name in ["uvicorn", "uvicorn.error", "uvicorn.access"]:
-    uvicorn_logger = logging.getLogger(logger_name)
-    uvicorn_logger.handlers.clear()
-    uvicorn_logger.propagate = False
-    handler = logging.StreamHandler()
-    handler.setFormatter(logging.Formatter(
-        '%(asctime)s %(name)-15s %(levelname)-5s %(message)s',
-        datefmt='%H:%M:%S'
-    ))
-    uvicorn_logger.addHandler(handler)
-    uvicorn_logger.setLevel(logging.INFO)
+configure_logging()
 
 app = FastAPI()
 app.state.active_route = None
