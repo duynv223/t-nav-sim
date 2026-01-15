@@ -29,18 +29,43 @@ class IqGenerator:
         sample_rate_hz: int = 2600000,
         duration_s: float | None = None,
     ) -> str:
-        out_file = Path(out_path)
-        out_file.parent.mkdir(parents=True, exist_ok=True)
         cmd = shlex.split(self._command) + [
             "-e",
             str(self._nav_path),
             "-u",
             str(nmea_path),
             "-o",
-            str(out_file),
+            str(out_path),
             "-s",
             str(sample_rate_hz),
         ]
+        return await self._run(cmd, out_path, duration_s=duration_s)
+
+    async def generate_static(
+        self,
+        lat: float,
+        lon: float,
+        hgt: float,
+        out_path: str,
+        sample_rate_hz: int = 2600000,
+        duration_s: float | None = None,
+    ) -> str:
+        location = f"{lat:.7f},{lon:.7f},{hgt:.2f}"
+        cmd = shlex.split(self._command) + [
+            "-e",
+            str(self._nav_path),
+            "-l",
+            location,
+            "-o",
+            str(out_path),
+            "-s",
+            str(sample_rate_hz),
+        ]
+        return await self._run(cmd, out_path, duration_s=duration_s)
+
+    async def _run(self, cmd: list[str], out_path: str, duration_s: float | None) -> str:
+        out_file = Path(out_path)
+        out_file.parent.mkdir(parents=True, exist_ok=True)
         if duration_s is not None:
             cmd.extend(["-d", f"{duration_s:.2f}"])
         cmd.extend(self._extra_args)

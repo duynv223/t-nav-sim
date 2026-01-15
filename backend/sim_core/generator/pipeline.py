@@ -68,8 +68,10 @@ class GenerationPipeline:
             out_path=str(nmea_fixed_path),
         )
 
-        await self._iq_gen.generate(
-            str(nmea_fixed_path),
+        await self._iq_gen.generate_static(
+            start_wp.lat,
+            start_wp.lon,
+            0.0,
             str(iq_fixed_path),
             sample_rate_hz=self._config.sample_rate_hz,
             duration_s=fixed_duration_s,
@@ -123,4 +125,3 @@ def _write_motion_csv(plan, path: Path) -> None:
                     f"{point.segment_progress:.4f}",
                 ]
             )
-
