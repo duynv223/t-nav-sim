@@ -1,5 +1,6 @@
 import asyncio
 import logging
+import os
 from typing import Awaitable
 
 from runtime.adapters.route_mapper import to_core_route
@@ -140,8 +141,8 @@ class SimManager:
         # LIVE
         await events.on_state("preparing")
         resolved_dry_run = self._dry_run_or_default(dry_run)
-        resolved_enable_gps = self._enable_or_default(enable_gps)
-        resolved_enable_motion = self._enable_or_default(enable_motion)
+        resolved_enable_gps = self._enable_or_default(enable_gps, "SIM_ENABLE_GPS")
+        resolved_enable_motion = self._enable_or_default(enable_motion, "SIM_ENABLE_MOTION")
 
         runner, playback = self._factory.build_live_runner(
             events,
@@ -221,10 +222,18 @@ class SimManager:
     # Small helpers
     # -----------------------------
     def _dry_run_or_default(self, dry_run: bool | None) -> bool:
-        return True if dry_run is None else dry_run
+        return self._flag_or_env(dry_run, "SIM_DRY_RUN", default=False)
 
-    def _enable_or_default(self, flag: bool | None) -> bool:
-        return True if flag is None else flag
+    def _enable_or_default(self, flag: bool | None, env_name: str) -> bool:
+        return self._flag_or_env(flag, env_name, default=False)
+
+    def _flag_or_env(self, flag: bool | None, env_name: str, default: bool) -> bool:
+        if flag is not None:
+            return flag
+        raw = os.getenv(env_name)
+        if raw is None:
+            return default
+        return raw.strip().lower() in {"1", "true", "yes", "on"}
 
     def _normalize_speed_multiplier(self, speed_multiplier: float) -> float:
         return speed_multiplier if speed_multiplier > 0 else DEMO_SPEED_MULTIPLIER_DEFAULT

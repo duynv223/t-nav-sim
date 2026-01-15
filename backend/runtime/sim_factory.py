@@ -19,7 +19,7 @@ logger = logging.getLogger(__name__)
 
 @dataclass(frozen=True)
 class SimFactoryConfig:
-    serial_port: str = "COM3"
+    serial_port: str = "COM4"
     nav_path: str = str(Path(__file__).resolve().parent / "assets" / "brdc0010.22n")
 
 
