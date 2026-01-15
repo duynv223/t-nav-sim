@@ -29,13 +29,13 @@ class SimFactory:
         return RouteDemoRunner(motion_gen, motion_player)
 
     def build_live_runner(self, events, dry_run: bool) -> tuple[RouteLiveRunner, PlaybackRunner]:
-        pipeline = self._build_pipeline()
+        gen_pipeline = self._build_generation_pipeline()
         gps, device = self._build_devices(dry_run)
         motion_player = MotionPlayer(events=events, device=device)
         playback = PlaybackRunner(gps=gps, motion_player=motion_player, events=events)
-        return RouteLiveRunner(pipeline, playback), playback
+        return RouteLiveRunner(gen_pipeline, playback), playback
 
-    def _build_pipeline(self) -> GenerationPipeline:
+    def _build_generation_pipeline(self) -> GenerationPipeline:
         output_dir = Path(__file__).resolve().parent / "artifacts"
         return GenerationPipeline(
             MotionGenerator(),
