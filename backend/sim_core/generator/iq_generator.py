@@ -29,6 +29,13 @@ class IqGenerator:
         sample_rate_hz: int = 2600000,
         duration_s: float | None = None,
     ) -> str:
+        logger.debug(
+            "IQ generate from NMEA: nmea=%s out=%s sample_rate=%s duration=%s",
+            nmea_path,
+            out_path,
+            sample_rate_hz,
+            duration_s,
+        )
         cmd = shlex.split(self._command) + [
             "-e",
             str(self._nav_path),
@@ -51,6 +58,13 @@ class IqGenerator:
         duration_s: float | None = None,
     ) -> str:
         location = f"{lat:.7f},{lon:.7f},{hgt:.2f}"
+        logger.debug(
+            "IQ generate static: location=%s out=%s sample_rate=%s duration=%s",
+            location,
+            out_path,
+            sample_rate_hz,
+            duration_s,
+        )
         cmd = shlex.split(self._command) + [
             "-e",
             str(self._nav_path),
@@ -75,11 +89,21 @@ class IqGenerator:
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE,
         )
-        stdout, stderr = await proc.communicate()
+        try:
+            stdout, stderr = await proc.communicate()
+        except asyncio.CancelledError:
+            logger.info("IQ generation cancelled; terminating process")
+            proc.terminate()
+            try:
+                await asyncio.wait_for(proc.wait(), timeout=2.0)
+            except asyncio.TimeoutError:
+                proc.kill()
+                await proc.wait()
+            raise
+        logger.debug("IQ generation finished with code %s", proc.returncode)
         if proc.returncode != 0:
             err = stderr.decode("utf-8", errors="replace").strip()
             raise RuntimeError(f"IQ generation failed: {err}")
         if stdout:
             logger.debug(stdout.decode("utf-8", errors="replace").strip())
         return str(out_file)
-
