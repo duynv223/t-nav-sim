@@ -6,18 +6,14 @@ import { MapPinPlus, Trash2, Play, Square, Pause, SkipForward, ChevronDown, Down
 const props = defineProps<{
   route: MapRoute
   mode: 'view' | 'add'
-  live: any
+  telemetry: any
   simState: 'idle' | 'running' | 'paused' | 'stopped'
   simStatus: { stage: string; detail?: string } | null
-  simMode: 'demo' | 'live'
-  speedMultiplier: number
   onModeChange: (mode: 'view' | 'add') => void
   onReset: () => void
   onRun: () => void
   onRunFromSegment: () => void
   onStop: () => void
-  onSimModeChange: (simMode: 'demo' | 'live') => void
-  onSpeedMultiplierChange: (multiplier: number) => void
   onSelectWaypoint: (idx: number) => void
   onSelectSegment: (idx: number) => void
   onFocusStart: () => void
@@ -29,7 +25,7 @@ const isPointsCollapsed = ref(true)
 const isSegmentsCollapsed = ref(false)
 const fileInputRef = ref<HTMLInputElement | null>(null)
 const activeTab = ref<'route' | 'simulation'>('route')
-const liveActivities = ref([
+const activities = ref([
   { id: 'generate', label: 'Generate Sim data', enabled: true },
   { id: 'gps_fixed', label: 'Set Initial Position', enabled: true },
   { id: 'simulate', label: 'Simulate Route', enabled: true },
@@ -64,7 +60,7 @@ function activityStatus(id: string) {
 function activityProgress(id: string) {
   if (id === 'simulate') {
     const total = props.route.segments.length
-    const idx = typeof props.live?.segmentIdx === 'number' ? props.live.segmentIdx : null
+  const idx = typeof props.telemetry?.segmentIdx === 'number' ? props.telemetry.segmentIdx : null
     if (total > 0 && idx !== null) {
       const current = Math.min(total, idx + 1)
       return `${current}/${total}`
@@ -573,60 +569,6 @@ watch(() => props.route.segments.map(s => s.speedProfile.type), (newTypes, oldTy
           Simulation Control
         </h4>
         
-        <!-- Simulation Mode Selection -->
-        <div class="mb-3">
-          <label class="block text-xs font-medium text-gray-700 mb-2">Simulation Mode</label>
-          <div class="flex gap-3">
-            <label class="flex items-center gap-2 cursor-pointer">
-              <input 
-                type="radio" 
-                name="sim-mode"
-                value="demo"
-                :checked="props.simMode === 'demo'"
-                @change="props.onSimModeChange('demo')"
-                :disabled="props.simState === 'running'"
-                class="w-4 h-4 text-blue-600 border-gray-300 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
-              />
-              <span class="text-sm text-gray-700" :class="{ 'opacity-50': props.simState === 'running' }">
-                Demo
-              </span>
-            </label>
-            <label class="flex items-center gap-2 cursor-pointer">
-              <input 
-                type="radio" 
-                name="sim-mode"
-                value="live"
-                :checked="props.simMode === 'live'"
-                @change="props.onSimModeChange('live')"
-                :disabled="props.simState === 'running'"
-                class="w-4 h-4 text-blue-600 border-gray-300 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
-              />
-              <span class="text-sm text-gray-700" :class="{ 'opacity-50': props.simState === 'running' }">
-                Live
-              </span>
-            </label>
-          </div>
-        </div>
-        
-        <!-- Speed Multiplier (only for Demo mode) -->
-        <div v-if="props.simMode === 'demo'" class="mb-3">
-          <label class="block text-xs font-medium text-gray-700 mb-1">Speed Multiplier</label>
-          <div class="flex items-center gap-2">
-            <input 
-              type="range" 
-              min="1" 
-              max="50" 
-              step="1"
-              :value="props.speedMultiplier"
-              @input="(e) => props.onSpeedMultiplierChange(Number((e.target as HTMLInputElement).value))"
-              :disabled="props.simState === 'running'"
-              class="flex-1 h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
-            />
-            <span class="text-sm font-medium text-gray-700 w-12 text-right">{{ props.speedMultiplier }}×</span>
-          </div>
-          <div class="mt-1 text-xs text-gray-500">1× = real-time, higher = faster visualization</div>
-        </div>
-        
         <!-- Status Bar -->
         <div class="mb-3 px-3 py-2 rounded-md border border-gray-300 bg-gray-50">
           <div class="flex items-center justify-between">
@@ -639,15 +581,9 @@ watch(() => props.route.segments.map(s => s.speedProfile.type), (newTypes, oldTy
               <span class="text-xs font-medium text-gray-700">
                 {{ props.simState.toUpperCase() }}
               </span>
-              <span v-if="props.simState === 'running'" class="text-xs font-medium" :class="{
-                'text-blue-600': props.simMode === 'demo',
-                'text-green-600': props.simMode === 'live'
-              }">
-                [{{ props.simMode === 'demo' ? `${props.speedMultiplier}×` : 'LIVE' }}]
-              </span>
             </div>
-            <span v-if="props.live?.segmentIdx !== undefined" class="text-xs text-gray-600">
-              Seg {{ props.live.segmentIdx + 1 }}/{{ props.route.segments.length }}
+            <span v-if="props.telemetry?.segmentIdx !== undefined" class="text-xs text-gray-600">
+              Seg {{ props.telemetry.segmentIdx + 1 }}/{{ props.route.segments.length }}
             </span>
           </div>
           <div v-if="props.simStatus" class="mt-1 text-[11px] text-gray-600">
@@ -707,11 +643,11 @@ watch(() => props.route.segments.map(s => s.speedProfile.type), (newTypes, oldTy
           </button>
         </div>
 
-        <div v-if="props.simMode === 'live'" class="mt-3 border-t border-gray-200 pt-3">
+        <div class="mt-3 border-t border-gray-200 pt-3">
           <div class="text-xs font-semibold text-gray-700 mb-2">Activities</div>
           <div class="space-y-1">
             <div
-              v-for="activity in liveActivities"
+              v-for="activity in activities"
               :key="activity.id"
               class="flex items-center justify-between gap-3 rounded-md px-2 py-2 hover:bg-gray-50"
             >
@@ -750,23 +686,23 @@ watch(() => props.route.segments.map(s => s.speedProfile.type), (newTypes, oldTy
         <div class="space-y-1 text-xs">
           <div class="flex justify-between">
             <span class="text-gray-600">t:</span>
-            <span class="font-mono">{{ live.t ?? '-' }}</span>
+            <span class="font-mono">{{ telemetry.t ?? '-' }}</span>
           </div>
           <div class="flex justify-between">
             <span class="text-gray-600">lat:</span>
-            <span class="font-mono">{{ live.lat ?? '-' }}</span>
+            <span class="font-mono">{{ telemetry.lat ?? '-' }}</span>
           </div>
           <div class="flex justify-between">
             <span class="text-gray-600">lon:</span>
-            <span class="font-mono">{{ live.lon ?? '-' }}</span>
+            <span class="font-mono">{{ telemetry.lon ?? '-' }}</span>
           </div>
           <div class="flex justify-between">
             <span class="text-gray-600">speed:</span>
-            <span class="font-mono">{{ live.speed ?? '-' }}</span>
+            <span class="font-mono">{{ telemetry.speed ?? '-' }}</span>
           </div>
           <div class="flex justify-between">
             <span class="text-gray-600">bearing:</span>
-            <span class="font-mono">{{ live.bearing ?? '-' }}</span>
+            <span class="font-mono">{{ telemetry.bearing ?? '-' }}</span>
           </div>
         </div>
         </div>

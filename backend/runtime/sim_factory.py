@@ -10,7 +10,7 @@ from sim_core.generate.iq_generator import IqGenerator
 from sim_core.generate.motion_generator import MotionGenerator
 from sim_core.generate.nmea_generator import NmeaGenerator
 from sim_core.generate.generate_pipeline import GenerationConfig, GenerationPipeline
-from sim_core.orchestrator import RouteDemoRunner, RouteLiveRunner
+from sim_core.orchestrator import RoutePlaybackRunner
 from sim_core.playback.runner import PlaybackRunner
 from sim_core.playback.motion_player import MotionPlayer
 
@@ -27,21 +27,13 @@ class SimFactory:
     def __init__(self, config: SimFactoryConfig | None = None):
         self._config = config or SimFactoryConfig()
 
-    def build_demo_runner(self, events) -> RouteDemoRunner:
-        motion_gen = MotionGenerator()
-        motion_player = MotionPlayer(
-            device=NullSpeedBearingDevice(),
-            on_point=events.on_data if events else None,
-        )
-        return RouteDemoRunner(motion_gen, motion_player)
-
-    def build_live_runner(
+    def build_playback_runner(
         self,
         events,
         dry_run: bool,
         enable_gps: bool = True,
         enable_motion: bool = True,
-    ) -> tuple[RouteLiveRunner, PlaybackRunner]:
+    ) -> tuple[RoutePlaybackRunner, PlaybackRunner]:
         gen_pipeline = self._build_generation_pipeline()
         gps, device = self._build_devices(dry_run, enable_gps, enable_motion)
         motion_player = MotionPlayer(
@@ -49,7 +41,7 @@ class SimFactory:
             on_point=events.on_data if events else None,
         )
         playback = PlaybackRunner(gps=gps, motion_player=motion_player, events=events)
-        return RouteLiveRunner(gen_pipeline, playback), playback
+        return RoutePlaybackRunner(gen_pipeline, playback), playback
 
     def _build_generation_pipeline(self) -> GenerationPipeline:
         output_dir = Path(__file__).resolve().parent / "artifacts"

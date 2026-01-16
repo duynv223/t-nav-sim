@@ -8,7 +8,7 @@
  */
 
 import { Ref, reactive, readonly, watch } from 'vue'
-import type { LiveData } from '@/types/map'
+import type { TelemetryData } from '@/types/map'
 import { useMapObjectPool } from './useMapObjectPool'
 import { useThrottle } from './useThrottle'
 import { generateCarSVG } from '@/utils/mapHelpers'
@@ -16,7 +16,7 @@ import { CAR_SIMULATION } from '@/types/constants'
 
 export function useCarSimulation(
   map: Ref<any>,
-  live: Ref<LiveData | undefined>
+  telemetry: Ref<TelemetryData | undefined>
 ) {
   const pool = useMapObjectPool(map)
   const { throttle } = useThrottle()
@@ -36,9 +36,9 @@ export function useCarSimulation(
    * Only updates icon when bearing changes significantly (performance optimization)
    */
   const updateCar = throttle((): void => {
-    if (!live.value || !map.value) return
+    if (!telemetry.value || !map.value) return
 
-    const { lat, lon, bearing = 0 } = live.value
+    const { lat, lon, bearing = 0 } = telemetry.value
     const bearingChanged = Math.abs(bearing - carState.bearing) > CAR_SIMULATION.BEARING_THRESHOLD
 
     if (bearingChanged || !pool.hasMarker('car')) {
@@ -75,11 +75,11 @@ export function useCarSimulation(
     carState.lastIconUpdate = 0
   }
 
-  // Auto-update when live data changes
+  // Auto-update when telemetry changes
   watch(
-    live,
+    telemetry,
     () => {
-      if (live.value) {
+      if (telemetry.value) {
         updateCar()
       } else {
         clearCar()

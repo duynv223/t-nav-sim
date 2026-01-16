@@ -65,7 +65,7 @@
 <script setup lang="ts">
 import { onMounted, onUnmounted, ref, toRef, watch, PropType, Ref } from 'vue'
 import { Route } from '../types/route'
-import type { EditorCallbacks, LiveData } from '@/types/map'
+import type { EditorCallbacks, TelemetryData } from '@/types/map'
 import { useMapEditor } from '@/composables/map/useMapEditor'
 import { useCarSimulation } from '@/composables/map/useCarSimulation'
 import { useRouteRenderer } from '@/composables/map/useRouteRenderer'
@@ -78,7 +78,7 @@ const props = defineProps({
   onSelectWaypoint: { type: Function as PropType<(idx:number)=>void>, required: false },
   onSelectSegment: { type: Function as PropType<(idx:number)=>void>, required: false },
   route: { type: Object as PropType<Route>, required: true },
-  live: { type: Object as PropType<Record<string, any>>, required: false }
+  telemetry: { type: Object as PropType<Record<string, any>>, required: false }
 })
 
 const mapEl = ref<HTMLDivElement | null>(null)
@@ -104,7 +104,7 @@ const callbacks: EditorCallbacks = {
 }
 
 const editor = useMapEditor(map, toRef(props, 'route'), callbacks, behavior)
-const simulation = useCarSimulation(map, toRef(props, 'live') as Ref<LiveData | undefined>)
+const simulation = useCarSimulation(map, toRef(props, 'telemetry') as Ref<TelemetryData | undefined>)
 const renderer = useRouteRenderer(
   map, 
   toRef(props, 'route'), 

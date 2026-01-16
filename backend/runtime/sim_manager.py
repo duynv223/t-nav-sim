@@ -6,15 +6,14 @@ from typing import Awaitable
 from runtime.adapters.route_mapper import to_core_route
 from runtime.adapters.ws_event_sink import NoClientsError, WsEventSink
 from runtime.sim_factory import SimFactory
-from runtime.sim_state import SimulationMode, SimulationState
+from runtime.sim_state import SimulationState
 from sim_core.playback.runner import PlaybackRunner
 from sim_core.route.models import SegmentRange
 
 logger = logging.getLogger(__name__)
 
-DEMO_SPEED_MULTIPLIER_DEFAULT = 10.0
-LIVE_DT = 0.1
-LIVE_FIXED_DURATION_S = 60.0
+PLAYBACK_DT = 0.1
+PLAYBACK_FIXED_DURATION_S = 60.0
 
 
 class SimManager:
@@ -29,7 +28,7 @@ class SimManager:
         self._stop_requested = False
 
         # Only used for graceful stop() before task cancellation
-        self._live_playback: PlaybackRunner | None = None
+        self._playback: PlaybackRunner | None = None
 
     # -----------------------------
     # Public API
@@ -44,8 +43,6 @@ class SimManager:
         self,
         route,
         segment_range: SegmentRange | None,
-        mode: SimulationMode,
-        speed_multiplier: float,
         dry_run: bool | None = None,
         enable_gps: bool | None = None,
         enable_motion: bool | None = None,
@@ -58,7 +55,7 @@ class SimManager:
             self._ensure_not_running()
 
             self._stop_requested = False
-            self._live_playback = None
+            self._playback = None
             await self._set_state(SimulationState.RUNNING)
 
             self._task = asyncio.create_task(
@@ -66,8 +63,6 @@ class SimManager:
                     self._run_entrypoint(
                         route=route,
                         segment_range=segment_range,
-                        mode=mode,
-                        speed_multiplier=speed_multiplier,
                         dry_run=dry_run,
                         enable_gps=enable_gps,
                         enable_motion=enable_motion,
@@ -78,7 +73,7 @@ class SimManager:
     async def stop(self) -> SimulationState:
         """
         Stop the currently running simulation (if any).
-        - Gracefully stops live playback if available
+        - Gracefully stops playback if available
         - Cancels the background task
         - Sets state STOPPED
         """
@@ -90,12 +85,12 @@ class SimManager:
 
             self._stop_requested = True
 
-            # Graceful stop for LIVE playback (if started)
-            if self._live_playback is not None:
+            # Graceful stop for playback (if started)
+            if self._playback is not None:
                 try:
-                    await self._live_playback.stop()
+                    await self._playback.stop()
                 except Exception:
-                    logger.exception("Failed to stop live playback gracefully")
+                    logger.exception("Failed to stop playback gracefully")
 
             self._task.cancel()
             try:
@@ -104,7 +99,7 @@ class SimManager:
                 logger.info("Simulation stopped (manually)")
 
             self._task = None
-            self._live_playback = None
+            self._playback = None
             await self._set_state(SimulationState.STOPPED)
             return self._state
 
@@ -116,8 +111,6 @@ class SimManager:
         *,
         route,
         segment_range: SegmentRange | None,
-        mode: SimulationMode,
-        speed_multiplier: float,
         dry_run: bool | None,
         enable_gps: bool | None,
         enable_motion: bool | None,
@@ -128,36 +121,24 @@ class SimManager:
         events = WsEventSink(self.publish)
         core_route = to_core_route(route)
 
-        if mode == SimulationMode.DEMO:
-            eff_speed = self._normalize_speed_multiplier(speed_multiplier)
-            simulator = self._factory.build_demo_runner(events)
-            await simulator.run(
-                core_route,
-                segment_range=segment_range,
-                speed_multiplier=eff_speed,
-            )
-            return
-
-        # LIVE
         await events.on_state("preparing")
         resolved_dry_run = self._dry_run_or_default(dry_run)
         resolved_enable_gps = self._enable_or_default(enable_gps, "SIM_ENABLE_GPS")
         resolved_enable_motion = self._enable_or_default(enable_motion, "SIM_ENABLE_MOTION")
 
-        runner, playback = self._factory.build_live_runner(
+        runner, playback = self._factory.build_playback_runner(
             events,
             resolved_dry_run,
             enable_gps=resolved_enable_gps,
             enable_motion=resolved_enable_motion,
         )
-        self._live_playback = playback
+        self._playback = playback
 
         await runner.run(
             core_route,
             segment_range=segment_range,
-            dt=LIVE_DT,
-            fixed_duration_s=LIVE_FIXED_DURATION_S,
-            speed_multiplier=1.0,
+            dt=PLAYBACK_DT,
+            fixed_duration_s=PLAYBACK_FIXED_DURATION_S,
         )
 
     # -----------------------------
@@ -181,13 +162,13 @@ class SimManager:
         Ensures playback is stopped and state is finalized.
         """
         # Ensure playback is stopped (defensive)
-        if self._live_playback is not None:
+        if self._playback is not None:
             try:
-                await self._live_playback.stop()
+                await self._playback.stop()
             except Exception:
-                logger.exception("Failed to stop live playback in cleanup")
+                logger.exception("Failed to stop playback in cleanup")
             finally:
-                self._live_playback = None
+                self._playback = None
 
         await self._finalize_run()
 
@@ -234,8 +215,4 @@ class SimManager:
         if raw is None:
             return default
         return raw.strip().lower() in {"1", "true", "yes", "on"}
-
-    def _normalize_speed_multiplier(self, speed_multiplier: float) -> float:
-        return speed_multiplier if speed_multiplier > 0 else DEMO_SPEED_MULTIPLIER_DEFAULT
-
 

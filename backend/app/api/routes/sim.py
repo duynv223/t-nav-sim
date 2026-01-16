@@ -34,8 +34,6 @@ async def sim_run(req: SimRunRequest, request: Request):
         await service.run(
             active_route,
             SegmentRange(start=start, end=end),
-            req.mode,
-            req.speedMultiplier,
             req.dryRun,
             req.enableGps,
             req.enableMotion,
@@ -43,8 +41,7 @@ async def sim_run(req: SimRunRequest, request: Request):
     except RuntimeError:
         raise HTTPException(status_code=400, detail="Simulation already running")
     logger.info(
-        "Simulation Started [%s]: %s | Segments %s-%s (%s) | %s clients",
-        req.mode.value,
+        "Simulation Started: %s | Segments %s-%s (%s) | %s clients",
         active_route.routeId,
         start,
         end,
@@ -59,7 +56,6 @@ async def sim_run(req: SimRunRequest, request: Request):
             "start": start,
             "end": end,
         },
-        "mode": req.mode.value,
     }
 
 @router.post("/sim/stop")

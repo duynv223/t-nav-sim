@@ -17,14 +17,10 @@
         v-show="activeTab === 'simulation'"
         :route="route"
         :mode="mode"
-        :live="live"
+        :telemetry="telemetry"
         :simState="simState"
         :simStatus="simStatus"
-        :simMode="simMode"
-        :speedMultiplier="speedMultiplier"
         :onModeChange="(newMode) => mode = newMode"
-        :onSimModeChange="(newSimMode) => simMode = newSimMode"
-        :onSpeedMultiplierChange="(newMultiplier) => speedMultiplier = newMultiplier"
         :onReset="resetRoute"
         :onRun="runSim"
         :onRunFromSegment="runSimFromSegment"
@@ -67,13 +63,11 @@ const workspaceTitle = computed(() => {
 })
 
 const route = ref(new Route())
-const live = ref<any>({})
+const telemetry = ref<any>({})
 const mode = ref<'view'|'add'>('view')
 const mapReady = ref(false)
 const simState = ref<'idle' | 'running' | 'paused' | 'stopped'>('idle')
-const simMode = ref<'demo' | 'live'>('demo')  // Simulation mode: demo (fast visualization) or live (real GPS)
 const simStatus = ref<{ stage: string; detail?: string } | null>(null)
-const speedMultiplier = ref(10.0)  // Speed multiplier for demo mode
 
 // Computed properties for template
 const waypoints = computed(() => route.value.points.map(p => ({ lat: p.lat, lon: p.lon })))
@@ -306,9 +300,6 @@ function debouncedSync() {
 
 // Watch route changes and sync
 watch(() => route.value, debouncedSync, { deep: true })
-watch(() => simMode.value, () => {
-  simStatus.value = null
-})
 
 async function runSim(){
   if(route.value.points.length < 2){ alert('Add at least two waypoints'); return }
@@ -322,9 +313,7 @@ async function runSim(){
     end: null // Run all segments
   }
   const body = {
-    segmentRange,
-    mode: simMode.value,
-    speedMultiplier: simMode.value === 'demo' ? speedMultiplier.value : 1.0
+    segmentRange
   }
 
   route.value.startSimulation(segmentRange.start, segmentRange.end)
@@ -371,9 +360,7 @@ async function runSimFromSegment(){
     end: null // Run to the end
   }
   const body = {
-    segmentRange,
-    mode: simMode.value,
-    speedMultiplier: simMode.value === 'demo' ? speedMultiplier.value : 1.0
+    segmentRange
   }
 
   route.value.startSimulation(segmentRange.start, segmentRange.end)
@@ -425,7 +412,7 @@ function resetRoute(){
   route.value = new Route()
 }
 
-// WebSocket live updates (connect to backend)
+// WebSocket telemetry updates (connect to backend)
 const backendHost = import.meta.env.VITE_API_URL || 'http://localhost:8000'
 const wsUrl = backendHost.replace('http', 'ws') + '/ws/sim'
 let ws: WebSocket | null = null
@@ -476,7 +463,7 @@ function connectWs(){
           }
         } else if (data.type === 'data') {
           // Simulation data message
-          live.value = data
+          telemetry.value = data
           route.value.updateSegmentStates(data.lat, data.lon)
         }
       }catch(e){}

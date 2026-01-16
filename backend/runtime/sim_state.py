@@ -6,8 +6,3 @@ class SimulationState(str, Enum):
     RUNNING = "running"
     PAUSED = "paused"
     STOPPED = "stopped"
-
-
-class SimulationMode(str, Enum):
-    DEMO = "demo"
-    LIVE = "live"

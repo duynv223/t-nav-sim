@@ -6,14 +6,10 @@ import MapView from './MapView.vue'
 defineProps<{
   route: Route
   mode: 'view' | 'add'
-  live: any
+  telemetry: any
   simState: 'idle' | 'running' | 'paused' | 'stopped'
   simStatus: { stage: string; detail?: string } | null
-  simMode: 'demo' | 'live'
-  speedMultiplier: number
   onModeChange: (mode: 'view' | 'add') => void
-  onSimModeChange: (simMode: 'demo' | 'live') => void
-  onSpeedMultiplierChange: (multiplier: number) => void
   onReset: () => void
   onRun: () => void
   onRunFromSegment: () => void
@@ -34,14 +30,10 @@ defineProps<{
     <RouteControlPanel 
       :route="route"
       :mode="mode"
-      :live="live"
+      :telemetry="telemetry"
       :simState="simState"
       :simStatus="simStatus"
-      :simMode="simMode"
-      :speedMultiplier="speedMultiplier"
       :onModeChange="onModeChange"
-      :onSimModeChange="onSimModeChange"
-      :onSpeedMultiplierChange="onSpeedMultiplierChange"
       :onReset="onReset"
       :onRun="onRun"
       :onRunFromSegment="onRunFromSegment"
@@ -62,7 +54,7 @@ defineProps<{
         :onSelectWaypoint="onSelectWaypoint"
         :onSelectSegment="onSelectSegment"
         :route="route"
-        :live="live"
+        :telemetry="telemetry"
       />
     </div>
   </div>

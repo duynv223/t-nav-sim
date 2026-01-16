@@ -57,7 +57,7 @@ export interface EditorCallbacks {
 }
 
 
-export interface LiveData {
+export interface TelemetryData {
   lat: number
   lon: number
   bearing?: number
