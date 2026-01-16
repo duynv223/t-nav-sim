@@ -29,7 +29,10 @@ class SimFactory:
 
     def build_demo_runner(self, events) -> RouteDemoRunner:
         motion_gen = MotionGenerator()
-        motion_player = MotionPlayer(events=events)
+        motion_player = MotionPlayer(
+            device=NullSpeedBearingDevice(),
+            on_point=events.on_data if events else None,
+        )
         return RouteDemoRunner(motion_gen, motion_player)
 
     def build_live_runner(
@@ -41,7 +44,10 @@ class SimFactory:
     ) -> tuple[RouteLiveRunner, PlaybackRunner]:
         gen_pipeline = self._build_generation_pipeline()
         gps, device = self._build_devices(dry_run, enable_gps, enable_motion)
-        motion_player = MotionPlayer(events=events, device=device)
+        motion_player = MotionPlayer(
+            device=device,
+            on_point=events.on_data if events else None,
+        )
         playback = PlaybackRunner(gps=gps, motion_player=motion_player, events=events)
         return RouteLiveRunner(gen_pipeline, playback), playback
 
