@@ -1,7 +1,7 @@
 from sim_core.generator.pipeline import GenerationPipeline
 from sim_core.generator.motion_generator import MotionGenerator
 from sim_core.player.plan import PlaybackPlan
-from sim_core.player.player import MotionPlayer
+from sim_core.player.motion_player import MotionPlayer
 from sim_core.player.playback import PlaybackRunner
 from sim_core.route.models import Route, SegmentRange
 

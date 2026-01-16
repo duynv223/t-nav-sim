@@ -2,7 +2,7 @@ import asyncio
 import logging
 
 from sim_core.player.plan import PlaybackPlan
-from sim_core.player.player import MotionPlayer
+from sim_core.player.motion_player import MotionPlayer
 from sim_core.ports import EventSink, GpsTransmitter
 
 logger = logging.getLogger(__name__)

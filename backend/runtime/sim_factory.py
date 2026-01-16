@@ -12,7 +12,7 @@ from sim_core.generator.nmea_generator import NmeaGenerator
 from sim_core.generator.pipeline import GenerationConfig, GenerationPipeline
 from sim_core.pipeline import RouteDemoRunner, RouteLiveRunner
 from sim_core.player.playback import PlaybackRunner
-from sim_core.player.player import MotionPlayer
+from sim_core.player.motion_player import MotionPlayer
 
 
 logger = logging.getLogger(__name__)
