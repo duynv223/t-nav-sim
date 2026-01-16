@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 
-from sim_core.generator.motion import MotionPlan
+from sim_core.models.motion import MotionPlan
 
 
 @dataclass(frozen=True)

@@ -7,7 +7,7 @@ from runtime.adapters.route_mapper import to_core_route
 from runtime.adapters.ws_event_sink import NoClientsError, WsEventSink
 from runtime.sim_factory import SimFactory
 from runtime.sim_state import SimulationMode, SimulationState
-from sim_core.player.playback import PlaybackRunner
+from sim_core.playback.runner import PlaybackRunner
 from sim_core.route.models import SegmentRange
 
 logger = logging.getLogger(__name__)

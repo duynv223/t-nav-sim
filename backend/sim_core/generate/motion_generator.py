@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from sim_core.generator.motion import MotionPlan, MotionPoint
+from sim_core.models.motion import MotionPlan, MotionPoint
 from sim_core.route.geo import bearing_degrees, haversine_meters
 from sim_core.route.models import Route, SegmentRange
 from sim_core.route.profiles import StopAtEndSpeedProfile

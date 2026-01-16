@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
-from sim_core.generator.motion import MotionPlan
+from sim_core.models.motion import MotionPlan
 
 KNOTS_PER_MPS = 1.943844492
 

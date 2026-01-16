@@ -1,4 +1,4 @@
-from sim_core.generator.motion import MotionPoint
+from sim_core.models.motion import MotionPoint
 from sim_core.ports import EventSink
 
 

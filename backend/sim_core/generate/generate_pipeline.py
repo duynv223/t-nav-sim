@@ -4,10 +4,11 @@ from dataclasses import dataclass
 import csv
 from pathlib import Path
 
-from sim_core.generator.artifacts import GenerationResult
-from sim_core.generator.iq_generator import IqGenerator
-from sim_core.generator.motion_generator import MotionGenerator
-from sim_core.generator.nmea_generator import NmeaGenerator
+from sim_core.generate.artifacts import GenerationResult
+from sim_core.generate.iq_generator import IqGenerator
+from sim_core.generate.motion_generator import MotionGenerator
+from sim_core.generate.nmea_generator import NmeaGenerator
+from sim_core.models.motion import MotionPlan
 from sim_core.route.models import Route, SegmentRange
 
 
@@ -15,6 +16,15 @@ from sim_core.route.models import Route, SegmentRange
 class GenerationConfig:
     output_dir: str = "output"
     sample_rate_hz: int = 2600000
+
+
+@dataclass(frozen=True)
+class ArtifactPaths:
+    motion_path: str
+    nmea_route_path: str
+    nmea_fixed_path: str
+    iq_route_path: str
+    iq_fixed_path: str
 
 
 class GenerationPipeline:
@@ -47,49 +57,67 @@ class GenerationPipeline:
 
         plan = self._motion_gen.generate(route, segment_range, dt=dt)
 
-        output_dir = Path(self._config.output_dir)
-        output_dir.mkdir(parents=True, exist_ok=True)
-        # Example: route_id "Hanoi - QL1A #1" -> safe name "Hanoi_-_QL1A__1"
-        route_tag = _safe_name(route.route_id)
-        motion_path = output_dir / f"{route_tag}_motion.csv"
-        nmea_route_path = output_dir / f"{route_tag}_route.nmea"
-        nmea_fixed_path = output_dir / f"{route_tag}_fixed.nmea"
-        iq_route_path = output_dir / f"{route_tag}_route.iq"
-        iq_fixed_path = output_dir / f"{route_tag}_fixed.iq"
+        paths = self.artifact_paths(route.route_id)
 
-        _write_motion_csv(plan, motion_path)
-        self._nmea_gen.generate(plan, str(nmea_route_path))
+        _write_motion_csv(plan, Path(paths.motion_path))
+        self._nmea_gen.generate(plan, paths.nmea_route_path)
         start_wp = route.waypoints[route.segments[start].from_idx]
         self._nmea_gen.generate_fixed(
             start_wp.lat,
             start_wp.lon,
             duration_s=fixed_duration_s,
             dt=dt,
-            out_path=str(nmea_fixed_path),
+            out_path=paths.nmea_fixed_path,
         )
 
         await self._iq_gen.generate_static(
             start_wp.lat,
             start_wp.lon,
             15.0,
-            str(iq_fixed_path),
+            paths.iq_fixed_path,
             sample_rate_hz=self._config.sample_rate_hz,
             duration_s=fixed_duration_s,
         )
         await self._iq_gen.generate(
-            str(nmea_route_path),
-            str(iq_route_path),
+            paths.nmea_route_path,
+            paths.iq_route_path,
             sample_rate_hz=self._config.sample_rate_hz,
         )
 
         return GenerationResult(
             motion=plan,
+            motion_path=paths.motion_path,
+            nmea_route_path=paths.nmea_route_path,
+            nmea_fixed_path=paths.nmea_fixed_path,
+            iq_route_path=paths.iq_route_path,
+            iq_fixed_path=paths.iq_fixed_path,
+            fixed_duration_s=fixed_duration_s,
+        )
+
+    def build_motion_plan(
+        self,
+        route: Route,
+        segment_range: SegmentRange | None = None,
+        dt: float = 0.1,
+    ) -> MotionPlan:
+        return self._motion_gen.generate(route, segment_range, dt=dt)
+
+    def artifact_paths(self, route_id: str) -> ArtifactPaths:
+        output_dir = Path(self._config.output_dir)
+        output_dir.mkdir(parents=True, exist_ok=True)
+        # Example: route_id "Hanoi - QL1A #1" -> safe name "Hanoi_-_QL1A__1"
+        route_tag = _safe_name(route_id)
+        motion_path = output_dir / f"{route_tag}_motion.csv"
+        nmea_route_path = output_dir / f"{route_tag}_route.nmea"
+        nmea_fixed_path = output_dir / f"{route_tag}_fixed.nmea"
+        iq_route_path = output_dir / f"{route_tag}_route.iq"
+        iq_fixed_path = output_dir / f"{route_tag}_fixed.iq"
+        return ArtifactPaths(
             motion_path=str(motion_path),
             nmea_route_path=str(nmea_route_path),
             nmea_fixed_path=str(nmea_fixed_path),
             iq_route_path=str(iq_route_path),
             iq_fixed_path=str(iq_fixed_path),
-            fixed_duration_s=fixed_duration_s,
         )
 
 

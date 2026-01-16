@@ -1,7 +1,7 @@
 import asyncio
 import logging
 
-from sim_core.generator.motion import MotionPlan
+from sim_core.models.motion import MotionPlan
 from sim_core.ports import EventSink, SpeedBearingDevice
 
 logger = logging.getLogger(__name__)
