@@ -19,15 +19,19 @@ class PlaybackRunner:
         self._motion_player = motion_player
         self._events = events
 
+    async def change_status(self, status: str) -> None:
+        if self._events is not None:
+            await self._events.on_state(status)
+
     async def play(self, plan: PlaybackPlan, speed_multiplier: float = 1.0) -> None:
-        logger.info("Playback start: speed_multiplier=%s", speed_multiplier)
-        if self._events is not None:
-            await self._events.on_state("gps_fixed")
+        # Initialize position by playing fixed IQ data
         logger.info("Playback GPS fixed: %s", plan.iq_fixed_path)
+        await self.change_status("gps_fixed")
         await self._gps.play_iq(plan.iq_fixed_path)
-        if self._events is not None:
-            await self._events.on_state("gps_route")
-        logger.info("Playback GPS route: %s", plan.iq_route_path)
+
+        # Playback gps and motion concurrently
+        logger.info("Playback start: speed_multiplier=%s", speed_multiplier)
+        await self.change_status("gps_route")
         gps_task = asyncio.create_task(self._gps.play_iq(plan.iq_route_path))
         motion_task = asyncio.create_task(
             self._motion_player.play(plan.motion, speed_multiplier=speed_multiplier)
@@ -35,14 +39,13 @@ class PlaybackRunner:
         try:
             await asyncio.gather(gps_task, motion_task)
         except Exception:
-            logger.info("Playback failed")
+            logger.error("Playback failed")
             for task in (gps_task, motion_task):
                 if not task.done():
                     task.cancel()
             await asyncio.gather(gps_task, motion_task, return_exceptions=True)
             raise
-        if self._events is not None:
-            await self._events.on_state("completed")
+        await self.change_status("completed")
         logger.info("Playback completed")
 
     async def stop(self) -> None:
