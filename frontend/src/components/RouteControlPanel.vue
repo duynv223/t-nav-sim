@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, watch, nextTick, computed } from 'vue'
 import { Route as MapRoute } from '@/types/route'
-import { MapPinPlus, Trash2, Play, Square, Pause, SkipForward, ChevronDown, Download, Upload, LocateFixed } from 'lucide-vue-next'
+import { MapPinPlus, Trash2, Play, Square, Pause, SkipForward, ChevronDown, Download, Upload, LocateFixed, Circle, CheckCircle2, AlertTriangle, Loader2 } from 'lucide-vue-next'
 
 const props = defineProps<{
   route: MapRoute
@@ -29,11 +29,66 @@ const isPointsCollapsed = ref(true)
 const isSegmentsCollapsed = ref(false)
 const fileInputRef = ref<HTMLInputElement | null>(null)
 const activeTab = ref<'route' | 'simulation'>('route')
+const liveActivities = ref([
+  { id: 'generate', label: 'Generate Sim data', enabled: true },
+  { id: 'gps_fixed', label: 'Set Initial Position', enabled: true },
+  { id: 'simulate', label: 'Simulate Route', enabled: true },
+])
 
 // Check if a segment is selected
 const hasSelectedSegment = computed(() => {
   return props.route.segments.some(s => s.isSelected)
 })
+
+const currentStage = computed(() => props.simStatus?.stage || null)
+
+function activityStatus(id: string) {
+  const stage = currentStage.value
+  if (stage === 'error' || stage === 'failed') return 'error'
+  if (!stage) return 'idle'
+  if (id === 'generate') {
+    if (stage === 'preparing' || stage === 'generating') return 'running'
+    if (['gps_fixed', 'gps_route', 'completed'].includes(stage)) return 'done'
+  }
+  if (id === 'gps_fixed') {
+    if (stage === 'gps_fixed') return 'running'
+    if (['gps_route', 'completed'].includes(stage)) return 'done'
+  }
+  if (id === 'simulate') {
+    if (stage === 'gps_route') return 'running'
+    if (stage === 'completed') return 'done'
+  }
+  return props.simState === 'running' ? 'running' : 'idle'
+}
+
+function activityProgress(id: string) {
+  if (id === 'simulate') {
+    const total = props.route.segments.length
+    const idx = typeof props.live?.segmentIdx === 'number' ? props.live.segmentIdx : null
+    if (total > 0 && idx !== null) {
+      const current = Math.min(total, idx + 1)
+      return `${current}/${total}`
+    }
+  }
+  const status = activityStatus(id)
+  if (status === 'done') return '1/1'
+  if (status === 'running') return '0/1'
+  return '0/1'
+}
+
+function statusIcon(status: string) {
+  if (status === 'running') return Loader2
+  if (status === 'done') return CheckCircle2
+  if (status === 'error') return AlertTriangle
+  return Circle
+}
+
+function statusClass(status: string) {
+  if (status === 'running') return 'text-blue-500 animate-spin'
+  if (status === 'done') return 'text-green-600'
+  if (status === 'error') return 'text-red-500'
+  return 'text-gray-300'
+}
 
 function handleClear() {
   showClearConfirm.value = true
@@ -650,6 +705,35 @@ watch(() => props.route.segments.map(s => s.speedProfile.type), (newTypes, oldTy
             :title="hasSelectedSegment ? 'Run from selected segment' : 'Select a segment first'">
             <SkipForward :size="18" />
           </button>
+        </div>
+
+        <div v-if="props.simMode === 'live'" class="mt-3 border-t border-gray-200 pt-3">
+          <div class="text-xs font-semibold text-gray-700 mb-2">Activities</div>
+          <div class="space-y-1">
+            <div
+              v-for="activity in liveActivities"
+              :key="activity.id"
+              class="flex items-center justify-between gap-3 rounded-md px-2 py-2 hover:bg-gray-50"
+            >
+              <label class="flex items-center gap-2 text-xs text-gray-700">
+                <input
+                  type="checkbox"
+                  v-model="activity.enabled"
+                  :disabled="props.simState === 'running'"
+                  class="h-4 w-4 text-blue-600 border-gray-300 rounded disabled:opacity-50 disabled:cursor-not-allowed"
+                />
+                <span>{{ activity.label }}</span>
+              </label>
+              <div class="flex items-center gap-2 text-xs text-gray-500">
+                <span class="font-mono">{{ activityProgress(activity.id) }}</span>
+                <component
+                  :is="statusIcon(activityStatus(activity.id))"
+                  class="h-4 w-4"
+                  :class="statusClass(activityStatus(activity.id))"
+                />
+              </div>
+            </div>
+          </div>
         </div>
         
         <div class="mt-2 text-xs text-gray-500 text-center">
