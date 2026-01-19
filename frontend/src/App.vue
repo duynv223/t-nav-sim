@@ -140,25 +140,28 @@ async function fetchSimState() {
 // Handle load-route event from RouteControlPanel
 function handleLoadRoute(event: CustomEvent) {
   const data = event.detail
-  
-  if (!data || !Array.isArray(data.waypoints)) {
+  if (!data || data.schema_version !== 1 || !Array.isArray(data.scenario?.route?.points)) {
     console.error('Invalid route data')
     return
   }
-  
+
+  const waypoints = data.scenario.route.points
+  const motionProfile = data.scenario.motion_profile
+  const routeId = data.scenario.meta?.name
+
   // Create new route from loaded data
   const newRoute = new Route()
   
   // Add waypoints
-  data.waypoints.forEach((wp: { lat: number, lon: number }) => {
+  waypoints.forEach((wp: { lat: number, lon: number }) => {
     newRoute.addPoint(wp.lat, wp.lon)
   })
   
   // Set route ID
-  newRoute.routeId = data.routeId || 'Loaded Route'
+  newRoute.routeId = routeId || 'Loaded Route'
 
-  if (data.motionProfile && data.motionProfile.type === 'simple' && data.motionProfile.params) {
-    newRoute.motionProfile = data.motionProfile
+  if (motionProfile && motionProfile.type === 'simple' && motionProfile.params) {
+    newRoute.motionProfile = motionProfile
   }
   
   // Assign to reactive ref
@@ -248,7 +251,7 @@ async function loadRouteFromBackend() {
     }
     
     const data = await response.json()
-    console.log('Loaded route from backend:', data.routeId)
+    console.log('Loaded route from backend:', data.scenario?.meta?.name)
     
     // Use the same load logic as file load
     const event = new CustomEvent('load-route', { detail: data })

@@ -154,15 +154,30 @@ async function saveRoute() {
   URL.revokeObjectURL(url)
 }
 
+const ROUTE_SCHEMA_VERSION = 1
+const ROUTE_APP_VERSION = '0.1'
+
 function buildRouteData() {
+  const id = typeof crypto !== 'undefined' && 'randomUUID' in crypto
+    ? crypto.randomUUID()
+    : `route-${Date.now()}`
+
+  const scenarioName = props.route.routeId || `Scenario-${Date.now()}`
+
   return {
-    routeId: props.route.routeId || `Route-${Date.now()}`,
-    waypoints: props.route.points.map(p => ({ lat: p.lat, lon: p.lon })),
-    segments: props.route.segments.map(s => ({
-      from: s.from,
-      to: s.to
-    })),
-    motionProfile: props.route.motionProfile
+    schema_version: ROUTE_SCHEMA_VERSION,
+    scenario: {
+      meta: {
+        id,
+        created_at: new Date().toISOString(),
+        app_version: ROUTE_APP_VERSION,
+        name: scenarioName
+      },
+      route: {
+        points: props.route.points.map(p => ({ lat: p.lat, lon: p.lon }))
+      },
+      motion_profile: props.route.motionProfile
+    }
   }
 }
 
@@ -179,10 +194,10 @@ async function loadRouteFromFile(event: Event) {
     const text = await file.text()
     const data = JSON.parse(text)
     
-    // Use file name as routeId if data.routeId is default/empty
+    // Use file name as scenario name if missing
     const fileName = file.name.replace('.json', '')
-    if (!data.routeId || data.routeId === 'Untitled Route' || data.routeId.startsWith('Route-')) {
-      data.routeId = fileName
+    if (data?.scenario?.meta && !data.scenario.meta.name) {
+      data.scenario.meta.name = fileName
     }
     
     // Emit loaded route data to parent
@@ -269,7 +284,7 @@ function formatSegmentDistance(seg: { from: number; to: number }) {
               : 'bg-transparent text-gray-500 hover:text-gray-700'
           ]"
         >
-          Route Edit
+          Scenario
         </button>
         <button
           @click="activeTab = 'simulation'"
@@ -290,7 +305,7 @@ function formatSegmentDistance(seg: { from: number; to: number }) {
       <!-- Route File Management Section -->
       <div class="p-4 border-b border-gray-200 bg-gray-50">
         <div class="flex items-center justify-between mb-2">
-          <h4 class="text-sm font-semibold text-gray-900">Route File</h4>
+          <h4 class="text-sm font-semibold text-gray-900">Scenario</h4>
           <div class="flex gap-2">
             <button
               @click="saveRoute"
