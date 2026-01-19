@@ -34,9 +34,10 @@ type BuildStatus = 'idle' | 'generating_motion' | 'generating_gps' | 'completed'
 type RunStatus = 'idle' | 'waiting' | 'generating' | 'running' | 'stopped' | 'failed'
 
 const buildStartTime = ref('2026-01-20 02:00:00')
-const buildStartEnabled = ref(true)
+const buildStartEnabled = ref(false)
 const runStartTime = ref('2026-01-20 02:05:00')
 const realtime = ref(false)
+const gpsOnly = ref(false)
 const buildStatus = ref<BuildStatus>('idle')
 const runStatus = ref<RunStatus>('idle')
 const buildProgress = ref({ current: 1, total: 20 })
@@ -668,7 +669,7 @@ function formatSegmentDistance(seg: { from: number; to: number }) {
               v-model="realtime"
               class="h-4 w-4 text-blue-600 border-gray-300 rounded"
             />
-            <span class="font-medium text-gray-700">Realtime</span>
+            <span class="font-medium text-gray-700">Realtime GPS</span>
           </label>
           <span
             class="ml-auto text-gray-400"
@@ -695,6 +696,17 @@ function formatSegmentDistance(seg: { from: number; to: number }) {
           >
             <Info class="h-4 w-4" />
           </span>
+        </div>
+
+        <div class="mt-2 flex items-center gap-3 text-xs text-gray-600">
+          <label class="flex items-center gap-2">
+            <input
+              type="checkbox"
+              v-model="gpsOnly"
+              class="h-4 w-4 text-blue-600 border-gray-300 rounded"
+            />
+            <span class="font-medium text-gray-700">GPS only</span>
+          </label>
         </div>
 
         <div class="mt-3">
