@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, watch, nextTick, computed } from 'vue'
 import { Route as MapRoute } from '@/types/route'
-import { MapPinPlus, Trash2, Play, Square, Pause, SkipForward, ChevronDown, Download, Upload, LocateFixed, Circle, CheckCircle2, AlertTriangle, Loader2 } from 'lucide-vue-next'
+import { MapPinPlus, Trash2, Play, Square, ChevronDown, Download, Upload, LocateFixed, Loader2, Info } from 'lucide-vue-next'
 
 const props = defineProps<{
   route: MapRoute
@@ -25,66 +25,91 @@ const isPointsCollapsed = ref(true)
 const isSegmentsCollapsed = ref(false)
 const fileInputRef = ref<HTMLInputElement | null>(null)
 const activeTab = ref<'route' | 'simulation'>('route')
-const activities = ref([
-  { id: 'generate', label: 'Generate Sim data', enabled: true },
-  { id: 'gps_fixed', label: 'Set Initial Position', enabled: true },
-  { id: 'simulate', label: 'Simulate Route', enabled: true },
-])
-
 // Check if a segment is selected
 const hasSelectedSegment = computed(() => {
   return props.route.segments.some(s => s.isSelected)
 })
 
-const currentStage = computed(() => props.simStatus?.stage || null)
+type BuildStatus = 'idle' | 'generating_motion' | 'generating_gps' | 'completed' | 'failed' | 'outdated'
+type RunStatus = 'idle' | 'waiting' | 'generating' | 'running' | 'stopped' | 'failed'
 
-function activityStatus(id: string) {
-  const stage = currentStage.value
-  if (stage === 'error' || stage === 'failed') return 'error'
-  if (!stage) return 'idle'
-  if (id === 'generate') {
-    if (stage === 'preparing' || stage === 'generating') return 'running'
-    if (['gps_fixed', 'gps_route', 'completed'].includes(stage)) return 'done'
+const buildStartTime = ref('2026-01-20 02:00:00')
+const buildStartEnabled = ref(true)
+const runStartTime = ref('2026-01-20 02:05:00')
+const realtime = ref(false)
+const buildStatus = ref<BuildStatus>('idle')
+const runStatus = ref<RunStatus>('idle')
+const buildProgress = ref({ current: 1, total: 20 })
+const runningTime = ref(32.4)
+
+const buildRunning = computed(() => buildStatus.value === 'generating_motion' || buildStatus.value === 'generating_gps')
+const runDisabled = computed(() => buildRunning.value)
+
+const buildStatusLabel = computed(() => {
+  switch (buildStatus.value) {
+    case 'idle':
+      return 'Idle'
+    case 'generating_motion':
+      return `Generating motion (${buildProgress.value.current}/${buildProgress.value.total})`
+    case 'generating_gps':
+      return 'Generating GPS IQ...'
+    case 'completed':
+      return 'Build completed'
+    case 'failed':
+      return 'Build failed'
+    case 'outdated':
+      return 'Outdated'
+    default:
+      return 'Idle'
   }
-  if (id === 'gps_fixed') {
-    if (stage === 'gps_fixed') return 'running'
-    if (['gps_route', 'completed'].includes(stage)) return 'done'
+})
+
+const runStatusLabel = computed(() => {
+  switch (runStatus.value) {
+    case 'idle':
+      return 'Idle'
+    case 'waiting':
+      return 'Waiting for start time'
+    case 'generating':
+      return 'Generating simulation data...'
+    case 'running':
+      return `Running (t = ${runningTime.value.toFixed(1)}s)`
+    case 'stopped':
+      return 'Stopped'
+    case 'failed':
+      return 'Run failed'
+    default:
+      return 'Idle'
   }
-  if (id === 'simulate') {
-    if (stage === 'gps_route') return 'running'
-    if (stage === 'completed') return 'done'
+})
+
+let scenarioInitialized = false
+watch(() => props.route, () => {
+  if (!scenarioInitialized) {
+    scenarioInitialized = true
+    return
   }
-  return props.simState === 'running' ? 'running' : 'idle'
+  if (!buildRunning.value) {
+    buildStatus.value = 'outdated'
+  }
+}, { deep: true })
+
+function formatDateTime(value: Date) {
+  const pad = (num: number) => num.toString().padStart(2, '0')
+  const year = value.getFullYear()
+  const month = pad(value.getMonth() + 1)
+  const day = pad(value.getDate())
+  const hours = pad(value.getHours())
+  const minutes = pad(value.getMinutes())
+  const seconds = pad(value.getSeconds())
+  return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`
 }
 
-function activityProgress(id: string) {
-  if (id === 'simulate') {
-    const total = props.route.segments.length
-  const idx = typeof props.telemetry?.segmentIdx === 'number' ? props.telemetry.segmentIdx : null
-    if (total > 0 && idx !== null) {
-      const current = Math.min(total, idx + 1)
-      return `${current}/${total}`
-    }
+watch(buildStartEnabled, (enabled) => {
+  if (enabled) {
+    buildStartTime.value = formatDateTime(new Date())
   }
-  const status = activityStatus(id)
-  if (status === 'done') return '1/1'
-  if (status === 'running') return '0/1'
-  return '0/1'
-}
-
-function statusIcon(status: string) {
-  if (status === 'running') return Loader2
-  if (status === 'done') return CheckCircle2
-  if (status === 'error') return AlertTriangle
-  return Circle
-}
-
-function statusClass(status: string) {
-  if (status === 'running') return 'text-blue-500 animate-spin'
-  if (status === 'done') return 'text-green-600'
-  if (status === 'error') return 'text-red-500'
-  return 'text-gray-300'
-}
+})
 
 function handleClear() {
   showClearConfirm.value = true
@@ -574,126 +599,120 @@ function formatSegmentDistance(seg: { from: number; to: number }) {
       </div>
 
       <div v-show="activeTab === 'simulation'">
-      <!-- Simulation Control Section -->
+      <!-- Build Section -->
       <div class="p-4 border-b border-gray-200">
-        <h4 class="text-sm font-semibold text-gray-900 mb-3 flex items-center gap-2">
-          <span class="w-1 h-4 bg-green-600 rounded"></span>
-          Simulation Control
-        </h4>
-        
-        <!-- Status Bar -->
-        <div class="mb-3 px-3 py-2 rounded-md border border-gray-300 bg-gray-50">
-          <div class="flex items-center justify-between">
-            <div class="flex items-center gap-2">
-              <div class="w-2 h-2 rounded-full" :class="{
-                'bg-gray-400': props.simState === 'idle' || props.simState === 'stopped',
-                'bg-gray-600 animate-pulse': props.simState === 'running',
-                'bg-gray-500': props.simState === 'paused'
-              }"></div>
-              <span class="text-xs font-medium text-gray-700">
-                {{ props.simState.toUpperCase() }}
-              </span>
-            </div>
-            <span v-if="props.telemetry?.segmentIdx !== undefined" class="text-xs text-gray-600">
-              Seg {{ props.telemetry.segmentIdx + 1 }}/{{ props.route.segments.length }}
-            </span>
+        <div class="flex items-center justify-between mb-3">
+          <h4 class="text-sm font-semibold text-gray-900 flex items-center gap-2">
+            <span class="w-1 h-4 bg-green-600 rounded"></span>
+            Build
+          </h4>
+          <div class="flex items-center gap-2 text-xs text-gray-600">
+            <span class="font-medium text-gray-700">Status:</span>
+            <span>{{ buildStatusLabel }}</span>
+            <Loader2 v-if="buildRunning" class="h-3 w-3 animate-spin text-gray-400" />
           </div>
-          <div v-if="props.simStatus" class="mt-1 text-[11px] text-gray-600">
-            Status: <span class="font-medium text-gray-700">{{ props.simStatus.stage }}</span>
-            <span v-if="props.simStatus.detail">- {{ props.simStatus.detail }}</span>
-          </div>
-        </div>
-        
-        <div class="flex flex-wrap gap-2">
-          <button 
-            @click="onRun"
-            :disabled="route.points.length < 2 || props.simState === 'running'"
-            :class="[
-              'h-10 w-10 flex items-center justify-center rounded-md transition-colors border',
-              route.points.length < 2 || props.simState === 'running'
-                ? 'bg-gray-50 text-gray-300 border-gray-200 cursor-not-allowed'
-                : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50 hover:border-gray-400'
-            ]"
-            :title="route.points.length < 2 ? 'Add at least 2 points to run' : props.simState === 'running' ? 'Simulation already running' : 'Start simulation'">
-            <Play :size="18" />
-          </button>
-          
-          <button 
-            :disabled="true"
-            :class="[
-              'h-10 w-10 flex items-center justify-center rounded-md transition-colors border',
-              'bg-gray-50 text-gray-300 border-gray-200 cursor-not-allowed'
-            ]"
-            title="Pause simulation (coming soon)">
-            <Pause :size="18" />
-          </button>
-          
-          <button 
-            @click="onStop"
-            :disabled="props.simState !== 'running'"
-            :class="[
-              'h-10 w-10 flex items-center justify-center rounded-md transition-colors border',
-              props.simState !== 'running'
-                ? 'bg-gray-50 text-gray-300 border-gray-200 cursor-not-allowed'
-                : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50 hover:border-gray-400'
-            ]"
-            title="Stop simulation">
-            <Square :size="18" />
-          </button>
-          
-          <button
-            @click="props.onRunFromSegment"
-            :disabled="props.simState === 'running' || !hasSelectedSegment"
-            :class="[
-              'h-10 w-10 flex items-center justify-center rounded-md transition-colors border',
-              props.simState === 'running' || !hasSelectedSegment
-                ? 'bg-gray-50 text-gray-300 border-gray-200 cursor-not-allowed'
-                : 'bg-white text-gray-600 border-gray-300 hover:bg-gray-50 hover:border-gray-400 cursor-pointer'
-            ]"
-            :title="hasSelectedSegment ? 'Run from selected segment' : 'Select a segment first'">
-            <SkipForward :size="18" />
-          </button>
         </div>
 
-        <div class="mt-3 border-t border-gray-200 pt-3">
-          <div class="text-xs font-semibold text-gray-700 mb-2">Activities</div>
-          <div class="space-y-1">
-            <div
-              v-for="activity in activities"
-              :key="activity.id"
-              class="flex items-center justify-between gap-3 rounded-md px-2 py-2 hover:bg-gray-50"
-            >
-              <label class="flex items-center gap-2 text-xs text-gray-700">
-                <input
-                  type="checkbox"
-                  v-model="activity.enabled"
-                  :disabled="props.simState === 'running'"
-                  class="h-4 w-4 text-blue-600 border-gray-300 rounded disabled:opacity-50 disabled:cursor-not-allowed"
-                />
-                <span>{{ activity.label }}</span>
-              </label>
-              <div class="flex items-center gap-2 text-xs text-gray-500">
-                <span class="font-mono">{{ activityProgress(activity.id) }}</span>
-                <component
-                  :is="statusIcon(activityStatus(activity.id))"
-                  class="h-4 w-4"
-                  :class="statusClass(activityStatus(activity.id))"
-                />
-              </div>
-            </div>
-          </div>
+        <div class="flex items-center gap-3 text-xs text-gray-600">
+          <label class="flex items-center gap-2">
+            <input
+              type="checkbox"
+              v-model="buildStartEnabled"
+              class="h-4 w-4 text-blue-600 border-gray-300 rounded"
+            />
+            <span class="font-medium text-gray-700">Start time</span>
+            <input
+              v-if="buildStartEnabled"
+              v-model="buildStartTime"
+              type="text"
+              class="w-44 px-2 py-1 border border-gray-300 rounded text-xs"
+            />
+          </label>
+          <span
+            class="ml-auto text-gray-400"
+            title="Start time for generated GPS signal"
+            aria-label="Start time for generated GPS signal"
+          >
+            <Info class="h-4 w-4" />
+          </span>
         </div>
-        
-        <div class="mt-2 text-xs text-gray-500 text-center">
-          {{ route.points.length < 2 ? 'Add at least 2 points' : 'Ready' }}
+
+        <div class="mt-3">
+          <button
+            class="inline-flex items-center gap-2 px-3 py-2 rounded-md text-xs font-medium border transition-colors"
+            :class="buildRunning ? 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50' : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'"
+            title="Toggle build">
+            <component :is="buildRunning ? Square : Play" :size="14" />
+            <span>{{ buildRunning ? 'Cancel' : 'Build' }}</span>
+          </button>
         </div>
       </div>
 
-      <!-- Simulation Data Section -->
-      <div class="p-4">
+      <!-- Run Section -->
+      <div class="p-4" :class="runDisabled ? 'opacity-50 pointer-events-none' : ''">
+        <div class="flex items-center justify-between mb-3">
+          <h4 class="text-sm font-semibold text-gray-900 flex items-center gap-2">
+            <span class="w-1 h-4 bg-blue-600 rounded"></span>
+            Run
+          </h4>
+          <div class="flex items-center gap-2 text-xs text-gray-600">
+            <span class="font-medium text-gray-700">Status:</span>
+            <span>{{ runStatusLabel }}</span>
+          </div>
+        </div>
+
+        <div class="flex items-center gap-4 text-xs text-gray-600">
+          <label class="flex items-center gap-2">
+            <input
+              type="checkbox"
+              v-model="realtime"
+              class="h-4 w-4 text-blue-600 border-gray-300 rounded"
+            />
+            <span class="font-medium text-gray-700">Realtime</span>
+          </label>
+          <span
+            class="ml-auto text-gray-400"
+            title="Automatically build simulation data and schedule playback at start time"
+            aria-label="Automatically build simulation data and schedule playback at start time"
+          >
+            <Info class="h-4 w-4" />
+          </span>
+        </div>
+
+        <div v-if="realtime" class="mt-2 flex items-center gap-3 text-xs text-gray-600">
+          <label class="flex items-center gap-2">
+            <span class="font-medium text-gray-700">Start time</span>
+            <input
+              v-model="runStartTime"
+              type="text"
+              class="w-44 px-2 py-1 border border-gray-300 rounded text-xs"
+            />
+          </label>
+          <span
+            class="ml-auto text-gray-400"
+            title="Playback will start automatically at this time"
+            aria-label="Playback will start automatically at this time"
+          >
+            <Info class="h-4 w-4" />
+          </span>
+        </div>
+
+        <div class="mt-3">
+          <button
+            class="inline-flex items-center gap-2 px-3 py-2 rounded-md text-xs font-medium border transition-colors"
+            :class="runStatus === 'running' ? 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50' : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'"
+            title="Toggle run">
+            <component :is="runStatus === 'running' ? Square : Play" :size="14" />
+            <span>{{ runStatus === 'running' ? 'Stop' : 'Run' }}</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- Current Motion Status -->
+      <div class="p-4 border-t border-gray-200">
         <h4 class="text-sm font-semibold text-gray-900 mb-3 flex items-center gap-2">
           <span class="w-1 h-4 bg-red-600 rounded"></span>
-          Simulation Data
+          Current Motion
         </h4>
         <div class="space-y-1 text-xs">
           <div class="flex justify-between">
@@ -717,11 +736,11 @@ function formatSegmentDistance(seg: { from: number; to: number }) {
             <span class="font-mono">{{ telemetry.bearing ?? '-' }}</span>
           </div>
         </div>
-        </div>
       </div>
-      </div>
-      
-      <!-- Clear Confirmation Modal -->
+    </div>
+    </div>
+
+    <!-- Clear Confirmation Modal -->
     <div v-if="showClearConfirm" class="absolute inset-0 bg-black/50 flex items-center justify-center z-50" @click="cancelClear">
       <div class="bg-white rounded-lg shadow-xl p-6 m-4 max-w-sm w-full" @click.stop>
         <h3 class="text-lg font-semibold text-gray-900 mb-2">Clear All Points?</h3>
