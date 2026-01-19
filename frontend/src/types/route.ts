@@ -1,5 +1,6 @@
 import { ROUTE_COLORS, ROUTE_RENDERER, ROUTE_STYLE } from './constants'
 import { SelectionType, SegmentState } from './enums'
+import { MotionProfile, createDefaultMotionProfile } from './motionProfile'
 
 export class RoutePoint {
   lat: number
@@ -97,6 +98,7 @@ export class Route {
   routeId: string = 'Untitled Route'
   points: RoutePoint[] = []
   segments: RouteSegment[] = []
+  motionProfile: MotionProfile = createDefaultMotionProfile()
   
   simulatingSegmentRange: { start: number, end: number } | null = null
   
@@ -317,13 +319,14 @@ export class Route {
     })
   }
   
-  toBackendFormat(): { waypoints: Array<{ lat: number; lon: number }>; segments: Array<{ from: number; to: number }> } {
+  toBackendFormat(): { waypoints: Array<{ lat: number; lon: number }>; segments: Array<{ from: number; to: number }>; motionProfile: MotionProfile } {
     return {
       waypoints: this.points.map(p => ({ lat: p.lat, lon: p.lon })),
       segments: this.segments.map(s => ({
         from: s.from,
         to: s.to
-      }))
+      })),
+      motionProfile: this.motionProfile
     }
   }
   

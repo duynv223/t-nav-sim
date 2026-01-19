@@ -161,7 +161,8 @@ function buildRouteData() {
     segments: props.route.segments.map(s => ({
       from: s.from,
       to: s.to
-    }))
+    })),
+    motionProfile: props.route.motionProfile
   }
 }
 
@@ -470,6 +471,87 @@ function formatSegmentDistance(seg: { from: number; to: number }) {
               </tr>
             </tbody>
           </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- Motion Profile Section -->
+      <div class="p-4 border-b border-gray-200">
+        <h4 class="text-sm font-semibold text-gray-900 mb-3 flex items-center gap-2">
+          <span class="w-1 h-4 bg-teal-600 rounded"></span>
+          Motion Profile
+        </h4>
+        <div class="space-y-3 text-xs">
+          <div>
+            <div class="text-gray-600 mb-1">Type</div>
+            <select
+              v-model="route.motionProfile.type"
+              class="w-full px-2 py-1 border border-gray-300 rounded text-xs"
+            >
+              <option value="simple">Simple</option>
+            </select>
+          </div>
+          <div class="grid gap-2">
+            <label class="flex items-center justify-between gap-2">
+              <span class="text-gray-600">Cruise speed (km/h)</span>
+              <input
+                type="number"
+                v-model.number="route.motionProfile.params.cruise_speed_kmh"
+                step="0.1"
+                min="0"
+                class="w-24 px-2 py-1 border border-gray-300 rounded text-xs text-right"
+              />
+            </label>
+            <label class="flex items-center justify-between gap-2">
+              <span class="text-gray-600">Acceleration (m/s2)</span>
+              <input
+                type="number"
+                v-model.number="route.motionProfile.params.accel_mps2"
+                step="0.1"
+                min="0"
+                class="w-24 px-2 py-1 border border-gray-300 rounded text-xs text-right"
+              />
+            </label>
+            <label class="flex items-center justify-between gap-2">
+              <span class="text-gray-600">Deceleration (m/s2)</span>
+              <input
+                type="number"
+                v-model.number="route.motionProfile.params.decel_mps2"
+                step="0.1"
+                min="0"
+                class="w-24 px-2 py-1 border border-gray-300 rounded text-xs text-right"
+              />
+            </label>
+            <label class="flex items-center justify-between gap-2">
+              <span class="text-gray-600">Turn slowdown per degree</span>
+              <input
+                type="number"
+                v-model.number="route.motionProfile.params.turn_slowdown_factor_per_deg"
+                step="0.01"
+                min="0"
+                class="w-24 px-2 py-1 border border-gray-300 rounded text-xs text-right"
+              />
+            </label>
+            <label class="flex items-center justify-between gap-2">
+              <span class="text-gray-600">Minimum turn speed (km/h)</span>
+              <input
+                type="number"
+                v-model.number="route.motionProfile.params.min_turn_speed_kmh"
+                step="0.1"
+                min="0"
+                class="w-24 px-2 py-1 border border-gray-300 rounded text-xs text-right"
+              />
+            </label>
+            <label class="flex items-center justify-between gap-2">
+              <span class="text-gray-600">Start hold (s)</span>
+              <input
+                type="number"
+                v-model.number="route.motionProfile.params.start_hold_s"
+                step="1"
+                min="0"
+                class="w-24 px-2 py-1 border border-gray-300 rounded text-xs text-right"
+              />
+            </label>
           </div>
         </div>
       </div>

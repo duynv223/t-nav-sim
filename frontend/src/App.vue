@@ -156,6 +156,10 @@ function handleLoadRoute(event: CustomEvent) {
   
   // Set route ID
   newRoute.routeId = data.routeId || 'Loaded Route'
+
+  if (data.motionProfile && data.motionProfile.type === 'simple' && data.motionProfile.params) {
+    newRoute.motionProfile = data.motionProfile
+  }
   
   // Assign to reactive ref
   route.value = newRoute
