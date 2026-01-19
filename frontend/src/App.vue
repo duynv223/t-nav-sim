@@ -141,7 +141,7 @@ async function fetchSimState() {
 function handleLoadRoute(event: CustomEvent) {
   const data = event.detail
   
-  if (!data || !data.waypoints || !data.segments) {
+  if (!data || !Array.isArray(data.waypoints)) {
     console.error('Invalid route data')
     return
   }
@@ -152,25 +152,6 @@ function handleLoadRoute(event: CustomEvent) {
   // Add waypoints
   data.waypoints.forEach((wp: { lat: number, lon: number }) => {
     newRoute.addPoint(wp.lat, wp.lon)
-  })
-  
-  // Update segments with loaded data
-  data.segments.forEach((seg: any) => {
-    const segIdx = newRoute.segments.findIndex(s => s.from === seg.from && s.to === seg.to)
-    if (segIdx >= 0) {
-      // Support both new format (speedProfile) and legacy formats
-      if (seg.speedProfile) {
-        newRoute.segments[segIdx].speedProfile = seg.speedProfile
-      } else if (seg.speed !== undefined && seg.endSpeed !== undefined) {
-        // Convert old format (speed/endSpeed) to ramp_to profile
-        newRoute.segments[segIdx].speedProfile = {
-          type: 'ramp_to',
-          params: {
-            target_kmh: seg.endSpeed
-          }
-        }
-      }
-    }
   })
   
   // Set route ID

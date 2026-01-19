@@ -160,8 +160,7 @@ function buildRouteData() {
     waypoints: props.route.points.map(p => ({ lat: p.lat, lon: p.lon })),
     segments: props.route.segments.map(s => ({
       from: s.from,
-      to: s.to,
-      speedProfile: s.speedProfile
+      to: s.to
     }))
   }
 }
@@ -245,33 +244,15 @@ watch(() => props.route.segments.length, (newLen, oldLen) => {
   }
 })
 
-// Helper function to initialize speed profile params based on type
-function initializeProfileParams(type: string): any {
-  switch(type) {
-    case 'constant':
-      return { speed_kmh: 25 }
-    case 'ramp_to':
-      return { target_kmh: 50 }
-    case 'cruise_to':
-      return { speed_kmh: 50 }
-    case 'stop_at_end':
-      return { stop_duration_s: 3 }
-    default:
-      return { speed_kmh: 25 }
-  }
-}
+const METERS_PER_DEGREE = 111000
 
-// Watch for profile type changes and reset params
-watch(() => props.route.segments.map(s => s.speedProfile.type), (newTypes, oldTypes) => {
-  if (!oldTypes) return
-  
-  props.route.segments.forEach((seg, idx) => {
-    if (oldTypes[idx] && newTypes[idx] !== oldTypes[idx]) {
-      // Profile type changed, reset params
-      seg.speedProfile.params = initializeProfileParams(newTypes[idx])
-    }
-  })
-}, { deep: true })
+function formatSegmentDistance(seg: { from: number; to: number }) {
+  const fromPoint = props.route.points[seg.from]
+  const toPoint = props.route.points[seg.to]
+  if (!fromPoint || !toPoint) return '-'
+  const meters = Math.hypot(toPoint.lat - fromPoint.lat, toPoint.lon - fromPoint.lon) * METERS_PER_DEGREE
+  return Math.round(meters).toString()
+}
 </script>
 
 <template>
@@ -469,9 +450,7 @@ watch(() => props.route.segments.map(s => s.speedProfile.type), (newTypes, oldTy
               <tr class="bg-gray-50">
                 <th class="border border-gray-200 px-2 py-1 text-left font-semibold">#</th>
                 <th class="border border-gray-200 px-2 py-1 text-left font-semibold">Route</th>
-                <th class="border border-gray-200 px-2 py-1 text-left font-semibold">
-                  Speed Profile
-                </th>
+                <th class="border border-gray-200 px-2 py-1 text-left font-semibold">distance (m)</th>
               </tr>
             </thead>
             <tbody>
@@ -486,75 +465,11 @@ watch(() => props.route.segments.map(s => s.speedProfile.type), (newTypes, oldTy
                   <span class="font-mono">{{ seg.from }}→{{ seg.to }}</span>
                 </td>
                 <td class="border border-gray-200 px-2 py-1">
-                  <!-- Profile Type Selector -->
-                  <select 
-                    v-model="seg.speedProfile.type" 
-                    class="w-full px-1 py-0.5 border border-gray-300 rounded text-xs mb-1"
-                    @click.stop>
-                    <option value="constant">Constant</option>
-                    <option value="ramp_to">Ramp To</option>
-                    <option value="cruise_to">Cruise To</option>
-                    <option value="stop_at_end">Stop at End</option>
-                  </select>
-                  
-                  <!-- Constant Profile -->
-                  <div v-if="seg.speedProfile.type === 'constant'" class="flex gap-1 items-center" @click.stop>
-                    <label class="text-[10px] text-gray-600">Speed:</label>
-                    <input 
-                      type="number" 
-                      v-model.number="seg.speedProfile.params.speed_kmh" 
-                      step="1"
-                      min="0"
-                      class="w-14 px-1 py-0.5 border border-gray-300 rounded text-xs text-center" 
-                    />
-                    <span class="text-[10px] text-gray-500">km/h</span>
-                  </div>
-                  
-                  <!-- Ramp To Profile -->
-                  <div v-if="seg.speedProfile.type === 'ramp_to'" class="flex gap-1 items-center" @click.stop>
-                    <label class="text-[10px] text-gray-600">Target:</label>
-                    <input 
-                      type="number" 
-                      v-model.number="seg.speedProfile.params.target_kmh" 
-                      step="1"
-                      min="0"
-                      class="w-14 px-1 py-0.5 border border-gray-300 rounded text-xs text-center" 
-                    />
-                    <span class="text-[10px] text-gray-500">km/h</span>
-                  </div>
-                  
-                  <!-- Cruise To Profile -->
-                  <div v-if="seg.speedProfile.type === 'cruise_to'" class="flex gap-1 items-center" @click.stop>
-                    <label class="text-[10px] text-gray-600">Speed:</label>
-                    <input 
-                      type="number" 
-                      v-model.number="seg.speedProfile.params.speed_kmh" 
-                      step="1"
-                      min="0"
-                      class="w-14 px-1 py-0.5 border border-gray-300 rounded text-xs text-center" 
-                    />
-                    <span class="text-[10px] text-gray-500">km/h</span>
-                  </div>
-                  
-                  <!-- Stop at End Profile -->
-                  <div v-if="seg.speedProfile.type === 'stop_at_end'" class="flex gap-1 items-center" @click.stop>
-                    <label class="text-[10px] text-gray-600">Stop:</label>
-                    <input 
-                      type="number" 
-                      v-model.number="seg.speedProfile.params.stop_duration_s" 
-                      step="0.5"
-                      min="0"
-                      class="w-14 px-1 py-0.5 border border-gray-300 rounded text-xs text-center" 
-                    />
-                    <span class="text-[10px] text-gray-500">s</span>
-                  </div>
+                  <span class="font-mono">{{ formatSegmentDistance(seg) }}</span>
                 </td>
               </tr>
             </tbody>
           </table>
-          <div class="mt-2 text-xs text-gray-500 italic">
-            💡 Select profile type and configure parameters for each segment
-          </div>
           </div>
         </div>
       </div>

@@ -1,6 +1,5 @@
 import { ROUTE_COLORS, ROUTE_RENDERER, ROUTE_STYLE } from './constants'
 import { SelectionType, SegmentState } from './enums'
-import { SpeedProfile, createDefaultSpeedProfile } from './speedProfile'
 
 export class RoutePoint {
   lat: number
@@ -42,19 +41,16 @@ export class RoutePoint {
 export class RouteSegment {
   from: number  // index in points array
   to: number    // index in points array
-  speedProfile: SpeedProfile
   isSelected: boolean = false
   
   state: SegmentState = SegmentState.PENDING
   
   constructor(
     from: number, 
-    to: number, 
-    speedProfile?: SpeedProfile
+    to: number
   ) {
     this.from = from
     this.to = to
-    this.speedProfile = speedProfile || createDefaultSpeedProfile()
   }
   
   getState(): SegmentState {
@@ -90,7 +86,7 @@ export class RouteSegment {
   }
   
   clone(): RouteSegment {
-    const segment = new RouteSegment(this.from, this.to, JSON.parse(JSON.stringify(this.speedProfile)))
+    const segment = new RouteSegment(this.from, this.to)
     segment.isSelected = this.isSelected
     segment.setState(this.state)
     return segment
@@ -262,8 +258,7 @@ export class Route {
       }
 
       const source = oldSegments[sourceIdx]
-      const speedProfile = JSON.parse(JSON.stringify(source.speedProfile))
-      const seg = new RouteSegment(i, i + 1, speedProfile)
+      const seg = new RouteSegment(i, i + 1)
       seg.setState(source.state)
       newSegments.push(seg)
     }
@@ -322,13 +317,12 @@ export class Route {
     })
   }
   
-  toBackendFormat(): { waypoints: Array<{ lat: number; lon: number }>; segments: Array<{ from: number; to: number; speedProfile: SpeedProfile }> } {
+  toBackendFormat(): { waypoints: Array<{ lat: number; lon: number }>; segments: Array<{ from: number; to: number }> } {
     return {
       waypoints: this.points.map(p => ({ lat: p.lat, lon: p.lon })),
       segments: this.segments.map(s => ({
         from: s.from,
-        to: s.to,
-        speedProfile: s.speedProfile
+        to: s.to
       }))
     }
   }
