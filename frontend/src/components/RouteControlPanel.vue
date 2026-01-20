@@ -233,11 +233,11 @@ async function startBuild() {
 
   try {
     let id = await ensureSession()
-    let response = await sendGenRequest(id, controller)
+    let response = await sendGenRequest(id!, controller)
     if (response.status === 404) {
       sessionId.value = null
       id = await ensureSession()
-      response = await sendGenRequest(id, controller)
+      response = await sendGenRequest(id!, controller)
     }
     if (!response.ok) {
       const error = await response.text()
