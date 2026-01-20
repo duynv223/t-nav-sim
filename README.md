@@ -19,10 +19,15 @@ uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 
 Backend will run at: `http://localhost:8000`
 
-### Backend environment flags
-These are only used when the request payload omits the corresponding fields.
-- `SIM_ENABLE_GPS`: set to `1`, `true`, `yes`, or `on` to enable GPS playback.
-- `SIM_ENABLE_MOTION`: set to `1`, `true`, `yes`, or `on` to enable speed/bearing playback.
+### Backend Run (Prod)
+```powershell
+cd backend
+.\run_prod.ps1
+```
+Optional overrides:
+```powershell
+.\run_prod.ps1 -ListenHost 0.0.0.0 -Port 8001 -Workers 4 -LogLevel debug
+```
 
 ### Frontend Setup
 ```powershell
