@@ -50,3 +50,6 @@ build/
 # OS
 Thumbs.db
 desktop.ini
+
+
+var/

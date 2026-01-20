@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Sequence
 
-from core.port import GpsTransmitter
+from dsim.core.port import GpsTransmitter
 
 
 @dataclass(frozen=True)

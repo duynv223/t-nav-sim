@@ -2,9 +2,9 @@ import errno
 import unittest
 from unittest.mock import patch
 
-from core.models import MotionSample
-from core.reporting import StepStatus
-from core.use_cases.play import PlayRequest, play_simulation
+from dsim.core.models import MotionSample
+from dsim.core.reporting import StepStatus
+from dsim.core.use_cases.play import PlayRequest, play_simulation
 
 
 class _FakeGpsTransmitter:
@@ -122,7 +122,7 @@ class PlaySimulationTests(unittest.TestCase):
             def join(self) -> None:
                 return None
 
-        with patch("core.use_cases.play.threading.Thread", _InlineThread):
+        with patch("dsim.core.use_cases.play.threading.Thread", _InlineThread):
             with self.assertRaises(OSError) as ctx:
                 play_simulation(
                     PlayRequest(samples=samples, iq_route_path="route.iq"),

@@ -1,11 +1,16 @@
-# Route Sim
+# Dsim
 
 GPS route simulation: generate motion samples + IQ stream (gps-sdr-sim), then play GPS IQ with speed/bearing control over serial.
 
+## Install
+```bash
+python -m pip install -e .
+```
+
 ## Quick usage
 ```bash
-python .\tools\rsim.py gen .\tools\data\sample-project\project.yaml
-python .\tools\rsim.py play .\tools\data\sample-project\project.yaml
+python .\tools\rsim.py gen .\tools\sample-project\project.yaml
+python .\tools\rsim.py play .\tools\sample-project\project.yaml
 ```
 
 ## Project file
@@ -16,4 +21,4 @@ python .\tools\rsim.py play .\tools\data\sample-project\project.yaml
 - `iq_generator`: gps-sdr-sim settings.
 - `playback`: HackRF + serial controller settings.
 
-Sample: `tools/data/sample-project/project.yaml`.
+Sample: `tools/sample-project/project.yaml`.

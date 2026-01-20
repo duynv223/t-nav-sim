@@ -190,11 +190,11 @@ def _iso_now() -> str:
     return datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
 
 
-def main(argv: list[str]) -> int:
+def main(argv: list[str] | None = None) -> int:
     if serial is None:  # pragma: no cover
         raise ImportError("pyserial is required") from _IMPORT_ERROR
 
-    args = _parse_args(argv)
+    args = _parse_args(sys.argv[1:] if argv is None else argv)
     out_dir = Path(args.output_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
     html_path = out_dir / "index.html"
@@ -249,4 +249,4 @@ def main(argv: list[str]) -> int:
 
 
 if __name__ == "__main__":
-    raise SystemExit(main(sys.argv[1:]))
+    raise SystemExit(main())

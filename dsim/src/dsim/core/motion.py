@@ -3,8 +3,8 @@ from __future__ import annotations
 import math
 from typing import List
 
-from core.geo import bearing_deg, haversine_m, interpolate
-from core.models import MotionProfile, MotionSample, Route, SimpleMotionProfile
+from dsim.core.geo import bearing_deg, haversine_m, interpolate
+from dsim.core.models import MotionProfile, MotionSample, Route, SimpleMotionProfile
 
 
 def _turn_delta_deg(prev_bearing: float, next_bearing: float) -> float:

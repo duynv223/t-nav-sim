@@ -6,8 +6,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Callable, Iterable, Sequence
 
-from core.models import MotionSample, Point
-from core.port import IqGenerator
+from dsim.core.models import MotionSample, Point
+from dsim.core.port import IqGenerator
 
 
 @dataclass(frozen=True)

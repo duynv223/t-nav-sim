@@ -5,11 +5,11 @@ from pathlib import Path
 from shutil import which
 
 from app.settings import Settings
-from adapters.iq_gps_sdr_sim import GpsSdrSimConfig, GpsSdrSimIqGenerator
-from core.models import MotionSample
-from core.port import IqGenerator
-from core.models import Point, Route, SimpleMotionProfile
-from core.use_cases.gen import GenRequest, generate_artifacts
+from dsim.adapters.iq_gps_sdr_sim import GpsSdrSimConfig, GpsSdrSimIqGenerator
+from dsim.core.models import MotionSample
+from dsim.core.models import Point, Route, SimpleMotionProfile
+from dsim.core.port import IqGenerator
+from dsim.core.use_cases.gen import GenRequest, generate_artifacts
 
 from app.schemas import GenRequestPayload, MotionProfileParams
 

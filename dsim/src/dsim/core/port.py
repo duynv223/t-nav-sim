@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Callable, Iterable, Protocol
 
-from core.models import MotionSample, Point
+from dsim.core.models import MotionSample, Point
 
 
 class IqGenerator(Protocol):

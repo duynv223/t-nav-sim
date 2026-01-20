@@ -1,9 +1,9 @@
 import math
 import unittest
 
-from core.geo import bearing_deg
-from core.models import Point, Route, SimpleMotionProfile
-from core.motion import generate_motion_samples
+from dsim.core.geo import bearing_deg
+from dsim.core.models import Point, Route, SimpleMotionProfile
+from dsim.core.motion import generate_motion_samples
 
 
 class MotionSampleTests(unittest.TestCase):

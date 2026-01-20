@@ -2,9 +2,9 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from core.models import Point, Route, SimpleMotionProfile
-from core.reporting import ReporterProtocol, StepStatus, StepUpdate
-from core.use_cases.gen import GenRequest, generate_artifacts
+from dsim.core.models import Point, Route, SimpleMotionProfile
+from dsim.core.reporting import ReporterProtocol, StepStatus, StepUpdate
+from dsim.core.use_cases.gen import GenRequest, generate_artifacts
 
 
 class _FakeIqGenerator:

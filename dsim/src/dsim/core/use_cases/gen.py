@@ -4,10 +4,10 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import List
 
-from core.models import MotionProfile, MotionSample, Route
-from core.motion import generate_motion_samples
-from core.port import IqGenerator
-from core.reporting import ReporterProtocol, StepInfo, step_context
+from dsim.core.models import MotionProfile, MotionSample, Route
+from dsim.core.motion import generate_motion_samples
+from dsim.core.port import IqGenerator
+from dsim.core.reporting import ReporterProtocol, StepInfo, step_context
 
 
 @dataclass(frozen=True)

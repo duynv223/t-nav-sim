@@ -4,7 +4,7 @@ import time
 from dataclasses import dataclass
 from typing import Optional
 
-from core.port import SpeedBearingController
+from dsim.core.port import SpeedBearingController
 
 try:
     import serial

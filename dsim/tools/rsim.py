@@ -9,18 +9,25 @@ from collections.abc import Callable
 from pathlib import Path
 
 ROOT_DIR = Path(__file__).resolve().parents[1]
-if str(ROOT_DIR) not in sys.path:
-    sys.path.insert(0, str(ROOT_DIR))
+SRC_DIR = ROOT_DIR / "src"
+if SRC_DIR.exists() and str(SRC_DIR) not in sys.path:
+    sys.path.insert(0, str(SRC_DIR))
 
-from adapters.gps_hackrf import HackrfGpsTransmitter, HackrfTxConfig
-from adapters.iq_gps_sdr_sim import GpsSdrSimConfig, GpsSdrSimIqGenerator
-from adapters.speed_bearing_serial import SpeedBearingSerialConfig, SerialSpeedBearingController
-from core.models import MotionSample, Point, Route, SimpleMotionProfile
-from core.reporting import ReporterProtocol, StepInfo, StepUpdate
-from core.use_cases.gen import GenRequest, generate_artifacts
-from core.use_cases.play import PlayRequest, play_simulation
+import dsim
 
-DEFAULT_EPHEMERIS = ROOT_DIR / "assets" / "brdc0010.22n"
+PACKAGE_DIR = Path(dsim.__file__).resolve().parent
+
+from dsim.adapters.gps_hackrf import HackrfGpsTransmitter, HackrfTxConfig
+from dsim.adapters.iq_gps_sdr_sim import GpsSdrSimConfig, GpsSdrSimIqGenerator
+from dsim.adapters.speed_bearing_serial import SpeedBearingSerialConfig, SerialSpeedBearingController
+from dsim.core.models import MotionSample, Point, Route, SimpleMotionProfile
+from dsim.core.reporting import ReporterProtocol, StepInfo, StepUpdate
+from dsim.core.use_cases.gen import GenRequest, generate_artifacts
+from dsim.core.use_cases.play import PlayRequest, play_simulation
+
+DEFAULT_EPHEMERIS = PACKAGE_DIR / "assets" / "brdc0010.22n"
+if not DEFAULT_EPHEMERIS.exists():
+    DEFAULT_EPHEMERIS = None
 DEFAULT_GPS_SDR_SIM = Path(r"C:\gps-sdr-sim\gps-sdr-sim.exe")
 
 
@@ -456,8 +463,8 @@ def _run_play(project_path: Path) -> int:
     return 0
 
 
-def main(argv: list[str]) -> int:
-    args = _parse_args(argv)
+def main(argv: list[str] | None = None) -> int:
+    args = _parse_args(sys.argv[1:] if argv is None else argv)
     project_path = Path(args.project)
     if not project_path.exists():
         raise FileNotFoundError(project_path)
@@ -485,4 +492,4 @@ def _motion_logger() -> Callable[[MotionSample], None]:
 
 
 if __name__ == "__main__":
-    raise SystemExit(main(sys.argv[1:]))
+    raise SystemExit(main())

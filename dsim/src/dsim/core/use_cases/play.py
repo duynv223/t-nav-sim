@@ -7,9 +7,9 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Iterable, List
 
-from core.models import MotionSample
-from core.port import GpsTransmitter, SpeedBearingController
-from core.reporting import ReporterProtocol, StepInfo, StepStatus, StepUpdate, step_context
+from dsim.core.models import MotionSample
+from dsim.core.port import GpsTransmitter, SpeedBearingController
+from dsim.core.reporting import ReporterProtocol, StepInfo, StepStatus, StepUpdate, step_context
 
 
 @dataclass(frozen=True)

@@ -6,11 +6,11 @@ from dataclasses import dataclass
 from pathlib import Path
 
 BASE_DIR = Path(__file__).resolve().parents[1]
-SIM_DIR = BASE_DIR / "sim"
-ASSETS_DIR = SIM_DIR / "assets"
+REPO_DIR = BASE_DIR.parent
+DSIM_SRC_DIR = REPO_DIR / "dsim" / "src"
 
-if str(SIM_DIR) not in sys.path:
-    sys.path.insert(0, str(SIM_DIR))
+if DSIM_SRC_DIR.exists() and str(DSIM_SRC_DIR) not in sys.path:
+    sys.path.insert(0, str(DSIM_SRC_DIR))
 
 
 @dataclass(frozen=True)
@@ -38,9 +38,9 @@ def _env_flag(name: str, default: bool) -> bool:
 
 
 def load_settings() -> Settings:
-    session_root = _env_path("SIM_SESSION_ROOT", SIM_DIR / "out" / "sessions")
+    session_root = _env_path("SIM_SESSION_ROOT", REPO_DIR / "var" / "sessions")
     gps_sdr_sim_path = os.environ.get("SIM_GPS_SDR_SIM_PATH", "gps-sdr-sim")
-    ephemeris_path = _env_path("SIM_EPHEMERIS_PATH", ASSETS_DIR / "brdc0010.22n")
+    ephemeris_path = _env_path("SIM_EPHEMERIS_PATH", _default_ephemeris_path())
     iq_bits = int(os.environ.get("SIM_IQ_BITS", "8"))
     iq_sample_rate_hz = int(os.environ.get("SIM_IQ_SAMPLE_RATE_HZ", "2600000"))
     enable_iq = _env_flag("SIM_ENABLE_IQ", True)
@@ -55,3 +55,12 @@ def load_settings() -> Settings:
         iq_sample_rate_hz=iq_sample_rate_hz,
         enable_iq=enable_iq,
     )
+
+
+def _default_ephemeris_path() -> Path:
+    try:
+        import dsim
+    except ImportError:
+        return BASE_DIR / "assets" / "brdc0010.22n"
+    assets_dir = Path(dsim.__file__).resolve().parent / "assets"
+    return assets_dir / "brdc0010.22n"
