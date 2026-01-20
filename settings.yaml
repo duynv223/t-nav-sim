@@ -1,0 +1,10 @@
+iq_generator:
+  iq_bits: 8
+  iq_sample_rate_hz: 2600000
+gps_transmitter:
+  center_freq_hz: 1575420000
+  sample_rate_hz: 2600000
+  txvga_gain: 40
+  amp_enabled: true
+controller:
+  port: COM4

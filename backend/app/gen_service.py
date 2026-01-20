@@ -4,6 +4,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from shutil import which
 
+from app.app_settings import IqGeneratorSettings
 from app.settings import Settings
 from dsim.adapters.iq_gps_sdr_sim import GpsSdrSimConfig, GpsSdrSimIqGenerator
 from dsim.core.models import MotionSample
@@ -14,7 +15,12 @@ from dsim.core.use_cases.gen import GenRequest, generate_artifacts
 from app.schemas import GenRequestPayload, MotionProfileParams
 
 
-def run_gen(request: GenRequestPayload, session_root: Path, settings: Settings) -> tuple[Path, Path]:
+def run_gen(
+    request: GenRequestPayload,
+    session_root: Path,
+    settings: Settings,
+    iq_settings: IqGeneratorSettings | None = None,
+) -> tuple[Path, Path]:
     route = _build_route(request.scenario.route.points)
     profile = _build_profile(request.scenario.motion_profile.params)
 
@@ -22,7 +28,7 @@ def run_gen(request: GenRequestPayload, session_root: Path, settings: Settings) 
     motion_path = _resolve_output(session_root, outputs.motion_csv, "motion.csv")
     iq_path = _resolve_output(session_root, outputs.iq, "route.iq")
 
-    iq_generator = _select_iq_generator(settings)
+    iq_generator = _select_iq_generator(settings, iq_settings)
 
     gen_request = GenRequest(
         route=route,
@@ -85,23 +91,29 @@ class _NullIqGenerator(IqGenerator):
         return str(path)
 
 
-def _select_iq_generator(settings: Settings) -> IqGenerator:
+def _select_iq_generator(
+    settings: Settings,
+    iq_settings: IqGeneratorSettings | None,
+) -> IqGenerator:
     if not settings.enable_iq:
         return _NullIqGenerator()
-    ephemeris_path = Path(settings.ephemeris_path)
-    gps_sdr_sim_path = Path(settings.gps_sdr_sim_path)
+    iq_profile = iq_settings or IqGeneratorSettings()
+    ephemeris_path_value = settings.ephemeris_path
+    gps_sdr_sim_value = settings.gps_sdr_sim_path
+    ephemeris_path = Path(ephemeris_path_value)
+    gps_sdr_sim_path = Path(gps_sdr_sim_value)
     resolved_gps_sdr_sim = None
     if gps_sdr_sim_path.exists():
         resolved_gps_sdr_sim = str(gps_sdr_sim_path)
     else:
-        resolved_gps_sdr_sim = which(settings.gps_sdr_sim_path)
+        resolved_gps_sdr_sim = which(gps_sdr_sim_value)
     if not ephemeris_path.exists() or not resolved_gps_sdr_sim:
         return _NullIqGenerator()
     iq_config = GpsSdrSimConfig(
-        ephemeris_path=settings.ephemeris_path,
+        ephemeris_path=str(ephemeris_path),
         gps_sdr_sim_path=str(resolved_gps_sdr_sim),
-        output_sample_rate_hz=settings.iq_sample_rate_hz,
-        iq_bits=settings.iq_bits,
+        output_sample_rate_hz=iq_profile.iq_sample_rate_hz,
+        iq_bits=iq_profile.iq_bits,
     )
     return GpsSdrSimIqGenerator(iq_config)
 

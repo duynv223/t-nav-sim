@@ -21,6 +21,7 @@ class Settings:
     iq_bits: int
     iq_sample_rate_hz: int
     enable_iq: bool
+    app_settings_path: Path
 
 
 def _env_path(name: str, default: Path) -> Path:
@@ -44,6 +45,7 @@ def load_settings() -> Settings:
     iq_bits = int(os.environ.get("SIM_IQ_BITS", "8"))
     iq_sample_rate_hz = int(os.environ.get("SIM_IQ_SAMPLE_RATE_HZ", "2600000"))
     enable_iq = _env_flag("SIM_ENABLE_IQ", True)
+    app_settings_path = _env_path("SIM_SETTINGS_PATH", REPO_DIR / "settings.yaml")
 
     session_root.mkdir(parents=True, exist_ok=True)
 
@@ -54,6 +56,7 @@ def load_settings() -> Settings:
         iq_bits=iq_bits,
         iq_sample_rate_hz=iq_sample_rate_hz,
         enable_iq=enable_iq,
+        app_settings_path=app_settings_path,
     )
 
 

@@ -8,6 +8,7 @@ from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 
+from app.app_settings import AppSettings
 from app.jobs import GenJobManager, JobStatus
 from app.schemas import (
     GenRequestPayload,
@@ -15,12 +16,14 @@ from app.schemas import (
     SessionCreatePayload,
     SessionInfoPayload,
 )
+from app.settings_store import SettingsStore
 from app.session_store import SessionStore
 from app.settings import load_settings
 
 settings = load_settings()
 session_store = SessionStore(settings.session_root)
 job_manager = GenJobManager(settings)
+settings_store = SettingsStore(settings.app_settings_path)
 
 app = FastAPI(title="Nav Sim Backend", version="0.1.0")
 
@@ -101,7 +104,8 @@ def generate(session_id: str, payload: GenRequestPayload) -> GenJobStatusPayload
         raise HTTPException(status_code=404, detail="session not found")
     try:
         logger.info("gen.start id=%s", session_id)
-        job = job_manager.start(session_id, info.root, payload.model_dump())
+        iq_settings = settings_store.get().iq_generator.model_dump()
+        job = job_manager.start(session_id, info.root, payload.model_dump(), iq_settings)
     except Exception as exc:
         logger.info("gen.fail id=%s error=%s", session_id, exc)
         raise HTTPException(status_code=400, detail=str(exc)) from exc
@@ -131,6 +135,19 @@ def cancel_gen(session_id: str, job_id: str) -> GenJobStatusPayload:
         raise HTTPException(status_code=404, detail="job not found")
     logger.info("gen.cancel id=%s job_id=%s status=%s", session_id, job_id, job.status)
     return _job_payload(job)
+
+
+@app.get("/settings", response_model=AppSettings)
+def get_settings() -> AppSettings:
+    logger.info("settings.get status=ok")
+    return settings_store.get()
+
+
+@app.put("/settings", response_model=AppSettings)
+def update_settings(payload: AppSettings) -> AppSettings:
+    settings_store.update(payload)
+    logger.info("settings.update status=ok")
+    return settings_store.get()
 
 
 @app.get("/sessions/{session_id}/gen/{job_id}/events")

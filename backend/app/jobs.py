@@ -9,6 +9,7 @@ from threading import Lock, Thread
 from typing import Any, Dict, Optional
 import uuid
 
+from app.app_settings import IqGeneratorSettings
 from app.gen_service import run_gen
 from app.schemas import GenRequestPayload
 from app.settings import Settings
@@ -41,6 +42,7 @@ def _run_gen_job(
     payload: dict,
     session_root: str,
     settings_data: dict,
+    iq_settings: dict | None,
     result_queue: Queue,
 ) -> None:
     try:
@@ -52,8 +54,17 @@ def _run_gen_job(
             iq_bits=settings_data["iq_bits"],
             iq_sample_rate_hz=settings_data["iq_sample_rate_hz"],
             enable_iq=settings_data["enable_iq"],
+            app_settings_path=Path(settings_data["app_settings_path"]),
         )
-        motion_path, iq_path = run_gen(request, Path(session_root), settings)
+        iq_profile = None
+        if iq_settings:
+            iq_profile = IqGeneratorSettings.model_validate(iq_settings)
+        motion_path, iq_path = run_gen(
+            request,
+            Path(session_root),
+            settings,
+            iq_settings=iq_profile,
+        )
         result_queue.put(
             {"status": "ok", "motion_csv": str(motion_path), "iq": str(iq_path)}
         )
@@ -68,7 +79,13 @@ class GenJobManager:
         self._active_by_session: Dict[str, str] = {}
         self._lock = Lock()
 
-    def start(self, session_id: str, session_root: Path, payload: dict) -> GenJob:
+    def start(
+        self,
+        session_id: str,
+        session_root: Path,
+        payload: dict,
+        iq_settings: dict | None = None,
+    ) -> GenJob:
         with self._lock:
             active_id = self._active_by_session.get(session_id)
             if active_id:
@@ -95,11 +112,12 @@ class GenJobManager:
                 "iq_bits": self._settings.iq_bits,
                 "iq_sample_rate_hz": self._settings.iq_sample_rate_hz,
                 "enable_iq": self._settings.enable_iq,
+                "app_settings_path": str(self._settings.app_settings_path),
             }
 
             proc = Process(
                 target=_run_gen_job,
-                args=(payload, str(session_root), settings_data, queue),
+                args=(payload, str(session_root), settings_data, iq_settings, queue),
                 daemon=True,
             )
             job.process = proc
