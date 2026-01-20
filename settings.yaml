@@ -4,7 +4,7 @@ iq_generator:
 gps_transmitter:
   center_freq_hz: 1575420000
   sample_rate_hz: 2600000
-  txvga_gain: 40
+  txvga_gain: 30
   amp_enabled: true
 controller:
   port: COM4

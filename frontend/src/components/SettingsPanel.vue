@@ -168,6 +168,7 @@ onMounted(() => {
                     type="number"
                     step="1"
                     min="0"
+                    max="47"
                     class="w-full px-2 py-1 border border-gray-300 rounded"
                   />
                 </label>

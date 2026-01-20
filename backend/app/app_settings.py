@@ -36,6 +36,12 @@ class GpsTransmitterSettings(BaseModel):
     txvga_gain: int = 40
     amp_enabled: bool = True
 
+    @validator("txvga_gain")
+    def _check_txvga_gain(cls, value: int) -> int:
+        if not 0 <= value <= 47:
+            raise ValueError("txvga_gain must be between 0 and 47")
+        return value
+
 
 class ControllerSettings(BaseModel):
     port: str = "COM4"
