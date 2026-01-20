@@ -45,7 +45,7 @@ const runningTime = ref(32.4)
 const sessionId = ref<string | null>(null)
 const buildAbort = ref<AbortController | null>(null)
 const buildJobId = ref<string | null>(null)
-const buildPollTimer = ref<number | null>(null)
+const buildEventSource = ref<EventSource | null>(null)
 
 const apiBaseUrl = import.meta.env.VITE_SIM_API_URL || 'http://localhost:8000'
 
@@ -92,7 +92,7 @@ watch(() => props.route, () => {
     buildStatus.value = 'outdated'
     sessionId.value = null
     buildJobId.value = null
-    stopBuildPolling()
+    stopBuildEvents()
   }
 }, { deep: true })
 
@@ -118,7 +118,7 @@ onBeforeUnmount(() => {
     buildAbort.value.abort()
     buildAbort.value = null
   }
-  stopBuildPolling()
+  stopBuildEvents()
 })
 
 async function ensureSession() {
@@ -147,25 +147,44 @@ async function sendGenRequest(id: string, controller: AbortController) {
   return response
 }
 
-function startBuildPolling() {
-  stopBuildPolling()
-  buildPollTimer.value = window.setInterval(async () => {
-    if (!sessionId.value || !buildJobId.value) return
+function startBuildEvents() {
+  stopBuildEvents()
+  if (!sessionId.value || !buildJobId.value) return
+  const url = `${apiBaseUrl}/sessions/${sessionId.value}/gen/${buildJobId.value}/events`
+  const source = new EventSource(url)
+  buildEventSource.value = source
+  let opened = false
+
+  const handleEvent = (event: MessageEvent) => {
+    opened = true
     try {
-      const response = await fetch(`${apiBaseUrl}/sessions/${sessionId.value}/gen/${buildJobId.value}`)
-      if (!response.ok) return
-      const job = await response.json()
+      const job = JSON.parse(event.data)
       handleBuildJob(job)
     } catch (err) {
-      console.error('Failed to poll build status:', err)
+      console.error('Failed to parse build event:', err)
     }
-  }, 1000)
+  }
+
+  source.addEventListener('status', handleEvent as EventListener)
+  source.onmessage = handleEvent
+  source.onopen = () => {
+    opened = true
+  }
+  source.onerror = () => {
+    if (buildEventSource.value !== source) return
+    if (!opened) {
+      console.error('Build event stream error')
+    }
+    if (source.readyState === EventSource.CLOSED) {
+      buildEventSource.value = null
+    }
+  }
 }
 
-function stopBuildPolling() {
-  if (buildPollTimer.value !== null) {
-    window.clearInterval(buildPollTimer.value)
-    buildPollTimer.value = null
+function stopBuildEvents() {
+  if (buildEventSource.value) {
+    buildEventSource.value.close()
+    buildEventSource.value = null
   }
 }
 
@@ -178,16 +197,16 @@ function handleBuildJob(job: any) {
       break
     case 'completed':
       buildStatus.value = 'completed'
-      stopBuildPolling()
+      stopBuildEvents()
       break
     case 'failed':
       buildStatus.value = 'none'
-      stopBuildPolling()
+      stopBuildEvents()
       alert(`Build failed: ${job.error || 'Unknown error'}`)
       break
     case 'canceled':
       buildStatus.value = 'none'
-      stopBuildPolling()
+      stopBuildEvents()
       break
     default:
       break
@@ -246,7 +265,7 @@ async function startBuild() {
     const job = await response.json()
     handleBuildJob(job)
     if (job.status === 'running' || job.status === 'pending') {
-      startBuildPolling()
+      startBuildEvents()
     }
   } catch (err: any) {
     if (controller.signal.aborted) {
@@ -265,7 +284,7 @@ async function cancelBuild() {
   if (buildAbort.value) {
     buildAbort.value.abort()
   }
-  stopBuildPolling()
+  stopBuildEvents()
   if (sessionId.value && buildJobId.value) {
     try {
       await fetch(`${apiBaseUrl}/sessions/${sessionId.value}/gen/${buildJobId.value}/cancel`, {

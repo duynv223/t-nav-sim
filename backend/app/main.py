@@ -1,12 +1,14 @@
 from __future__ import annotations
 
+import asyncio
 import logging
 import time
 
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import StreamingResponse
 
-from app.jobs import GenJobManager
+from app.jobs import GenJobManager, JobStatus
 from app.schemas import (
     GenRequestPayload,
     GenJobStatusPayload,
@@ -68,7 +70,6 @@ def create_session(payload: SessionCreatePayload | None = None) -> SessionInfoPa
 
 @app.get("/sessions/{session_id}", response_model=SessionInfoPayload)
 def get_session(session_id: str) -> SessionInfoPayload:
-    print('Getting session:', session_id)
     info = session_store.get(session_id)
     if not info:
         logger.info("session.get id=%s status=not_found", session_id)
@@ -105,17 +106,7 @@ def generate(session_id: str, payload: GenRequestPayload) -> GenJobStatusPayload
         logger.info("gen.fail id=%s error=%s", session_id, exc)
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     logger.info("gen.job id=%s job_id=%s status=%s", session_id, job.job_id, job.status)
-    return GenJobStatusPayload(
-        job_id=job.job_id,
-        session_id=job.session_id,
-        status=job.status.value,
-        created_at=job.created_at,
-        started_at=job.started_at,
-        finished_at=job.finished_at,
-        motion_csv=job.motion_csv,
-        iq=job.iq,
-        error=job.error,
-    )
+    return _job_payload(job)
 
 
 @app.get("/sessions/{session_id}/gen/{job_id}", response_model=GenJobStatusPayload)
@@ -125,17 +116,7 @@ def get_gen_status(session_id: str, job_id: str) -> GenJobStatusPayload:
         logger.info("gen.status id=%s job_id=%s status=not_found", session_id, job_id)
         raise HTTPException(status_code=404, detail="job not found")
     logger.info("gen.status id=%s job_id=%s status=%s", session_id, job_id, job.status)
-    return GenJobStatusPayload(
-        job_id=job.job_id,
-        session_id=job.session_id,
-        status=job.status.value,
-        created_at=job.created_at,
-        started_at=job.started_at,
-        finished_at=job.finished_at,
-        motion_csv=job.motion_csv,
-        iq=job.iq,
-        error=job.error,
-    )
+    return _job_payload(job)
 
 
 @app.post("/sessions/{session_id}/gen/{job_id}/cancel", response_model=GenJobStatusPayload)
@@ -149,6 +130,25 @@ def cancel_gen(session_id: str, job_id: str) -> GenJobStatusPayload:
         logger.info("gen.cancel id=%s job_id=%s status=not_found", session_id, job_id)
         raise HTTPException(status_code=404, detail="job not found")
     logger.info("gen.cancel id=%s job_id=%s status=%s", session_id, job_id, job.status)
+    return _job_payload(job)
+
+
+@app.get("/sessions/{session_id}/gen/{job_id}/events")
+async def stream_gen_events(session_id: str, job_id: str, request: Request) -> StreamingResponse:
+    job = job_manager.get(job_id)
+    if not job or job.session_id != session_id:
+        logger.info("gen.events id=%s job_id=%s status=not_found", session_id, job_id)
+        raise HTTPException(status_code=404, detail="job not found")
+    logger.info("gen.events id=%s job_id=%s status=connected", session_id, job_id)
+    generator = _gen_job_events(request, session_id, job_id)
+    headers = {
+        "Cache-Control": "no-cache",
+        "Connection": "keep-alive",
+    }
+    return StreamingResponse(generator, media_type="text/event-stream", headers=headers)
+
+
+def _job_payload(job) -> GenJobStatusPayload:
     return GenJobStatusPayload(
         job_id=job.job_id,
         session_id=job.session_id,
@@ -160,3 +160,33 @@ def cancel_gen(session_id: str, job_id: str) -> GenJobStatusPayload:
         iq=job.iq,
         error=job.error,
     )
+
+
+async def _gen_job_events(request: Request, session_id: str, job_id: str):
+    last_status = None
+    last_ping = time.monotonic()
+    terminal_states = {JobStatus.COMPLETED, JobStatus.FAILED, JobStatus.CANCELED}
+
+    while True:
+        if await request.is_disconnected():
+            logger.info("gen.events id=%s job_id=%s status=disconnected", session_id, job_id)
+            break
+        job = job_manager.get(job_id)
+        if not job:
+            logger.info("gen.events id=%s job_id=%s status=missing", session_id, job_id)
+            break
+
+        if job.status != last_status:
+            payload = _job_payload(job).model_dump_json()
+            yield f"event: status\ndata: {payload}\n\n"
+            last_status = job.status
+
+        if job.status in terminal_states:
+            break
+
+        now = time.monotonic()
+        if now - last_ping >= 10:
+            yield ": ping\n\n"
+            last_ping = now
+
+        await asyncio.sleep(0.5)
