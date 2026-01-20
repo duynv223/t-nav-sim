@@ -76,7 +76,7 @@ class GenJobManager:
                 if active_job and active_job.status in {JobStatus.PENDING, JobStatus.RUNNING}:
                     return active_job
 
-            job_id = uuid.uuid4().hex
+            job_id = self._next_job_id()
             now = datetime.now(timezone.utc)
             queue: Queue = Queue()
             job = GenJob(
@@ -111,6 +111,13 @@ class GenJobManager:
             watcher.start()
 
             return job
+
+    def _next_job_id(self) -> str:
+        for _ in range(10):
+            candidate = uuid.uuid4().hex[:8]
+            if candidate not in self._jobs:
+                return candidate
+        raise RuntimeError("Failed to allocate job id")
 
     def _watch_job(self, job: GenJob) -> None:
         if not job.process or not job.queue:

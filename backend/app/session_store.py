@@ -4,8 +4,8 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Dict, Optional
+import secrets
 import shutil
-import uuid
 
 
 @dataclass(frozen=True)
@@ -23,7 +23,7 @@ class SessionStore:
         self._base_dir.mkdir(parents=True, exist_ok=True)
 
     def create(self, name: Optional[str] = None) -> SessionInfo:
-        session_id = uuid.uuid4().hex
+        session_id = self._next_id()
         root = self._base_dir / session_id
         root.mkdir(parents=True, exist_ok=True)
         info = SessionInfo(
@@ -34,6 +34,13 @@ class SessionStore:
         )
         self._sessions[session_id] = info
         return info
+
+    def _next_id(self) -> str:
+        for _ in range(10):
+            candidate = secrets.token_hex(4)
+            if candidate not in self._sessions:
+                return candidate
+        raise RuntimeError("Failed to allocate session id")
 
     def get(self, session_id: str) -> Optional[SessionInfo]:
         return self._sessions.get(session_id)
