@@ -30,38 +30,34 @@ const hasSelectedSegment = computed(() => {
   return props.route.segments.some(s => s.isSelected)
 })
 
-type BuildStatus = 'idle' | 'generating_motion' | 'generating_gps' | 'completed' | 'failed' | 'outdated'
-type RunStatus = 'idle' | 'waiting' | 'generating' | 'running' | 'stopped' | 'failed'
+type BuildStatus = 'none' | 'building' | 'outdated' | 'completed'
+type RunStatus = 'idle' | 'building' | 'waiting' | 'running'
 
 const buildStartTime = ref('2026-01-20 02:00:00')
 const buildStartEnabled = ref(false)
 const runStartTime = ref('2026-01-20 02:05:00')
 const realtime = ref(false)
 const gpsOnly = ref(false)
-const buildStatus = ref<BuildStatus>('idle')
+const buildStatus = ref<BuildStatus>('none')
 const runStatus = ref<RunStatus>('idle')
 const buildProgress = ref({ current: 1, total: 20 })
 const runningTime = ref(32.4)
 
-const buildRunning = computed(() => buildStatus.value === 'generating_motion' || buildStatus.value === 'generating_gps')
+const buildRunning = computed(() => buildStatus.value === 'building')
 const runDisabled = computed(() => buildRunning.value)
 
 const buildStatusLabel = computed(() => {
   switch (buildStatus.value) {
-    case 'idle':
-      return 'Idle'
-    case 'generating_motion':
-      return `Generating motion (${buildProgress.value.current}/${buildProgress.value.total})`
-    case 'generating_gps':
-      return 'Generating GPS IQ...'
+    case 'none':
+      return 'None'
+    case 'building':
+      return `Building (${buildProgress.value.current}/${buildProgress.value.total})`
     case 'completed':
       return 'Build completed'
-    case 'failed':
-      return 'Build failed'
     case 'outdated':
       return 'Outdated'
     default:
-      return 'Idle'
+      return 'None'
   }
 })
 
@@ -69,16 +65,12 @@ const runStatusLabel = computed(() => {
   switch (runStatus.value) {
     case 'idle':
       return 'Idle'
+    case 'building':
+      return 'Building'
     case 'waiting':
       return 'Waiting for start time'
-    case 'generating':
-      return 'Generating simulation data...'
     case 'running':
       return `Running (t = ${runningTime.value.toFixed(1)}s)`
-    case 'stopped':
-      return 'Stopped'
-    case 'failed':
-      return 'Run failed'
     default:
       return 'Idle'
   }
