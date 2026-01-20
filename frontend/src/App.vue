@@ -41,7 +41,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
 import AppSidebar from './components/AppSidebar.vue'
 import RouteSimulationWorkspace from './components/RouteSimulationWorkspace.vue'
 import SettingsPanel from './components/SettingsPanel.vue'
@@ -65,14 +65,8 @@ const workspaceTitle = computed(() => {
 const route = ref(new Route())
 const telemetry = ref<any>({})
 const mode = ref<'view'|'add'>('view')
-const mapReady = ref(false)
 const simState = ref<'idle' | 'running' | 'paused' | 'stopped'>('idle')
 const simStatus = ref<{ stage: string; detail?: string } | null>(null)
-
-// Computed properties for template
-const waypoints = computed(() => route.value.points.map(p => ({ lat: p.lat, lon: p.lon })))
-const segments = computed(() => route.value.segments)
-const selectedSegmentIdx = computed(() => route.value.segments.findIndex(s => s.isSelected))
 
 // ESC key handler
 function handleKeyDown(e: KeyboardEvent){
@@ -90,52 +84,12 @@ function handleKeyDown(e: KeyboardEvent){
 onMounted(() => {
   window.addEventListener('keydown', handleKeyDown)
   window.addEventListener('load-route', handleLoadRoute as EventListener)
-  window.addEventListener('map-ready', handleMapReady as EventListener)
 })
 
 onUnmounted(() => {
   window.removeEventListener('keydown', handleKeyDown)
   window.removeEventListener('load-route', handleLoadRoute as EventListener)
-  window.removeEventListener('map-ready', handleMapReady as EventListener)
-  
-  // Close WebSocket connection
-  if (ws) {
-    console.log('[App] Closing WebSocket on unmount')
-    ws.close()
-    ws = null
-  }
 })
-
-// Handle map ready event
-function handleMapReady() {
-  console.log('[App] Map is ready')
-  mapReady.value = true
-  
-  // Load route from backend after map is ready
-  loadRouteFromBackend()
-  
-  // Fetch initial simulation state
-  fetchSimState()
-  
-  // Connect WebSocket after map is ready
-  connectWs()
-}
-
-// Fetch initial simulation state from backend
-async function fetchSimState() {
-  try {
-    const response = await fetch(`${backendUrl}/sim/status`)
-    if (response.ok) {
-      const data = await response.json()
-      if (data.state) {
-        simState.value = data.state
-        console.log('[App] Initial simulation state:', data.state)
-      }
-    }
-  } catch (err) {
-    console.error('[App] Failed to fetch simulation state:', err)
-  }
-}
 
 // Handle load-route event from RouteControlPanel
 function handleLoadRoute(event: CustomEvent) {
@@ -227,252 +181,32 @@ function splitSelectedSegment(){
   }
 }
 
-const backendUrl = import.meta.env.VITE_API_URL || 'http://localhost:8000'
-let syncTimeout: ReturnType<typeof setTimeout> | null = null
-
-// Load route from backend (on app mount/reload)
-async function loadRouteFromBackend() {
-  if (!mapReady.value) {
-    console.log('[App] Waiting for map to be ready before loading route...')
-    return
-  }
-  
-  try {
-    const response = await fetch(`${backendUrl}/route`)
-    
-    if (response.status === 404) {
-      // No active route on backend, that's fine
-      console.log('No active route found on backend')
-      return
-    }
-    
-    if (!response.ok) {
-      throw new Error(`Failed to load route: ${response.status}`)
-    }
-    
-    const data = await response.json()
-    console.log('Loaded route from backend:', data.scenario?.meta?.name)
-    
-    // Use the same load logic as file load
-    const event = new CustomEvent('load-route', { detail: data })
-    handleLoadRoute(event)
-  } catch (err) {
-    console.error('Failed to load route from backend:', err)
-  }
-}
-
-// Auto-sync route changes to backend (debounced)
-async function syncRouteToBackend() {
-  if (route.value.points.length < 2) return // Don't sync incomplete routes
-  
-  const body = {
-    routeId: route.value.routeId || 'active-route',
-    ...route.value.toBackendFormat()
-  }
-  
-  try {
-    await fetch(`${backendUrl}/route`, {
-      method: 'PUT',
-      headers: {'content-type': 'application/json'},
-      body: JSON.stringify(body)
-    })
-  } catch (err) {
-    console.error('Failed to sync route:', err)
-  }
-}
-
-function debouncedSync() {
-  if (syncTimeout) clearTimeout(syncTimeout)
-  syncTimeout = setTimeout(syncRouteToBackend, 500) // Debounce 500ms
-}
-
-// Watch route changes and sync
-watch(() => route.value, debouncedSync, { deep: true })
-
-async function runSim(){
+function runSim(){
   if(route.value.points.length < 2){ alert('Add at least two waypoints'); return }
   simStatus.value = null
-  
-  // Ensure route is synced before running
-  await syncRouteToBackend()
-  
-  const segmentRange = {
-    start: 0,
-    end: null // Run all segments
-  }
-  const body = {
-    segmentRange
-  }
-
-  route.value.startSimulation(segmentRange.start, segmentRange.end)
-  
-  try {
-    const response = await fetch(`${backendUrl}/sim/run`, {
-      method: 'POST',
-      headers: {'content-type': 'application/json'},
-      body: JSON.stringify(body)
-    })
-    
-    if (!response.ok) {
-      const error = await response.json()
-      alert(`Failed to start simulation: ${error.detail}`)
-      route.value.stopSimulation()
-      return
-    }
-    
-    const result = await response.json()
-    // Update state from backend response
-    if (result.state) {
-      simState.value = result.state
-    }
-  } catch (err) {
-    console.error('Failed to start simulation:', err)
-    alert('Failed to start simulation')
-    route.value.stopSimulation()
-  }
+  route.value.startSimulation(0, null)
+  simState.value = 'running'
 }
 
-async function runSimFromSegment(){
+function runSimFromSegment(){
   const selectedIdx = route.value.segments.findIndex(s => s.isSelected)
   if (selectedIdx < 0) {
     alert('Please select a segment first')
     return
   }
   simStatus.value = null
-  
-  // Ensure route is synced before running
-  await syncRouteToBackend()
-  
-  const segmentRange = {
-    start: selectedIdx,
-    end: null // Run to the end
-  }
-  const body = {
-    segmentRange
-  }
-
-  route.value.startSimulation(segmentRange.start, segmentRange.end)
-  
-  try {
-    const response = await fetch(`${backendUrl}/sim/run`, {
-      method: 'POST',
-      headers: {'content-type': 'application/json'},
-      body: JSON.stringify(body)
-    })
-    
-    if (!response.ok) {
-      const error = await response.json()
-      alert(`Failed to start simulation: ${error.detail}`)
-      route.value.stopSimulation()
-      return
-    }
-    
-    const result = await response.json()
-    // Update state from backend response
-    if (result.state) {
-      simState.value = result.state
-    }
-  } catch (err) {
-    console.error('Failed to start simulation:', err)
-    alert('Failed to start simulation')
-    route.value.stopSimulation()
-  }
+  route.value.startSimulation(selectedIdx, null)
+  simState.value = 'running'
 }
 
-async function stopSim(){
-  try {
-    const response = await fetch(`${backendUrl}/sim/stop`, { method:'POST' })
-    if (response.ok) {
-      const result = await response.json()
-      if (result.state) {
-        simState.value = result.state
-      }
-      
-      // Stop simulation tracking to unlock segments
-      route.value.stopSimulation()
-    }
-  } catch (err) {
-    console.error('Failed to stop simulation:', err)
-  }
+function stopSim(){
+  simState.value = 'stopped'
+  route.value.stopSimulation()
 }
 
 function resetRoute(){
   route.value = new Route()
 }
-
-// WebSocket telemetry updates (connect to backend)
-const backendHost = import.meta.env.VITE_API_URL || 'http://localhost:8000'
-const wsUrl = backendHost.replace('http', 'ws') + '/ws/sim'
-let ws: WebSocket | null = null
-let wsConnected = ref(false)
-
-function connectWs(){
-  // Only connect if map is ready
-  if (!mapReady.value) {
-    console.log('[App] Waiting for map before connecting WebSocket...')
-    return
-  }
-  
-  try{
-    console.log('[App] Connecting WebSocket...')
-    ws = new WebSocket(wsUrl)
-    
-    ws.onopen = () => {
-      console.log('[App] WebSocket connected')
-      wsConnected.value = true
-      try {
-        ws?.send(JSON.stringify({ type: 'subscribe', topics: ['state', 'data', 'status'] }))
-      } catch (err) {
-        console.error('[App] Failed to send subscribe message:', err)
-      }
-    }
-    
-    ws.onmessage = (ev)=>{
-      try{ 
-        const data = JSON.parse(ev.data)
-        
-        // Handle message based on type
-        if (data.type === 'state') {
-          // State change message
-          const oldState = simState.value
-          simState.value = data.state
-          console.log('[App] State changed:', oldState, '→', data.state)
-          
-          // Clear locks when simulation stops (from any source)
-          if ((oldState === 'running' || oldState === 'paused') && 
-              (data.state === 'idle' || data.state === 'stopped')) {
-            console.log('[App] Clearing simulation locks')
-            route.value.stopSimulation()
-          }
-        } else if (data.type === 'status') {
-          simStatus.value = {
-            stage: data.stage || 'unknown',
-            detail: data.detail
-          }
-        } else if (data.type === 'data') {
-          // Simulation data message
-          telemetry.value = data
-          route.value.updateSegmentStates(data.lat, data.lon)
-        }
-      }catch(e){}
-    }
-    
-    ws.onclose = ()=>{ 
-      console.log('[App] WebSocket disconnected, reconnecting...')
-      wsConnected.value = false
-      setTimeout(connectWs, 1000) 
-    }
-    
-    ws.onerror = (err) => {
-      console.error('[App] WebSocket error:', err)
-    }
-  }catch(e){ 
-    console.error('[App] Failed to create WebSocket:', e)
-    setTimeout(connectWs, 1000) 
-  }
-}
-
-// Don't auto-connect on mount - wait for map-ready event
 
 // expose to MapView
 const onAddWaypointRef = onAddWaypoint

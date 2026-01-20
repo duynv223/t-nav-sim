@@ -2,9 +2,7 @@
 import { ref } from 'vue'
 
 // Mock settings
-const apiUrl = ref(import.meta.env.VITE_API_URL || 'http://localhost:8000')
 const hereApiKey = ref('***')
-const updateRate = ref(10)
 const mapStyle = ref('normal.day')
 </script>
 
@@ -14,23 +12,11 @@ const mapStyle = ref('normal.day')
       <h2 class="text-2xl font-bold mb-6">Settings</h2>
       
       <div class="bg-white rounded-lg shadow p-6 space-y-6">
-        <!-- API Settings -->
+        <!-- Map Settings -->
         <div>
-          <h3 class="text-lg font-semibold mb-4 border-b pb-2">API Configuration</h3>
+          <h3 class="text-lg font-semibold mb-4 border-b pb-2">Map Configuration</h3>
           
           <div class="space-y-4">
-            <div>
-              <label class="block text-sm font-medium text-gray-700 mb-1">
-                Backend API URL
-              </label>
-              <input 
-                v-model="apiUrl"
-                type="text" 
-                class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                placeholder="http://localhost:8000"
-              />
-            </div>
-            
             <div>
               <label class="block text-sm font-medium text-gray-700 mb-1">
                 HERE Maps API Key
@@ -43,29 +29,6 @@ const mapStyle = ref('normal.day')
               />
               <p class="text-xs text-gray-500 mt-1">
                 Get your free API key at <a href="https://developer.here.com/" target="_blank" class="text-blue-600 hover:underline">developer.here.com</a>
-              </p>
-            </div>
-          </div>
-        </div>
-
-        <!-- Simulation Settings -->
-        <div>
-          <h3 class="text-lg font-semibold mb-4 border-b pb-2">Simulation</h3>
-          
-          <div class="space-y-4">
-            <div>
-              <label class="block text-sm font-medium text-gray-700 mb-1">
-                Update Rate (Hz)
-              </label>
-              <input 
-                v-model.number="updateRate"
-                type="number" 
-                min="1"
-                max="60"
-                class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
-              <p class="text-xs text-gray-500 mt-1">
-                WebSocket update frequency: {{ updateRate }} updates/second
               </p>
             </div>
           </div>
