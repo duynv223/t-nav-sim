@@ -1,0 +1,39 @@
+route: hoankiem_2.csv
+
+motion_profile:
+  kind: simple
+  cruise_speed_kmh: 20.0
+  accel_mps2: 1.0
+  decel_mps2: 1.0
+  turn_slowdown_factor_per_deg: 0.1
+  min_turn_speed_kmh: 5
+  turn_rate_deg_s: 20.0
+  start_hold_s: 60
+  start_speed_kmh: 3.0
+  start_speed_s: 30.0
+
+sim_data_path:
+  motion: out/motion.csv
+  route_iq: out/route.iq
+
+iq_generator:
+  gps_sdr_sim_path: "C:\\gps-sdr-sim\\gps-sdr-sim.exe"
+  ephemeris_path: ""
+  iq_bits: 8
+  iq_sample_rate_hz: 2600000
+  extra_args: ""
+
+playback:
+  gps_transmitter:
+    enabled: true
+    kind: hackrf
+    hackrf_transfer_path: "hackrf_transfer"
+    center_freq_hz: 1575420000
+    sample_rate_hz: 2600000
+    txvga_gain: 40
+    amp_enabled: true
+    extra_args: ""
+  controller:
+    enabled: true
+    kind: serial
+    port: "COM4"
