@@ -584,11 +584,41 @@ function formatSegmentDistance(seg: { from: number; to: number }) {
               />
             </label>
             <label class="flex items-center justify-between gap-2">
+              <span class="text-gray-600">Turn rate (deg/s)</span>
+              <input
+                type="number"
+                v-model.number="route.motionProfile.params.turn_rate_deg_s"
+                step="0.1"
+                min="0"
+                class="w-24 px-2 py-1 border border-gray-300 rounded text-xs text-right"
+              />
+            </label>
+            <label class="flex items-center justify-between gap-2">
               <span class="text-gray-600">Start hold (s)</span>
               <input
                 type="number"
                 v-model.number="route.motionProfile.params.start_hold_s"
                 step="1"
+                min="0"
+                class="w-24 px-2 py-1 border border-gray-300 rounded text-xs text-right"
+              />
+            </label>
+            <label class="flex items-center justify-between gap-2">
+              <span class="text-gray-600">Start speed (km/h)</span>
+              <input
+                type="number"
+                v-model.number="route.motionProfile.params.start_speed_kmh"
+                step="0.1"
+                min="0"
+                class="w-24 px-2 py-1 border border-gray-300 rounded text-xs text-right"
+              />
+            </label>
+            <label class="flex items-center justify-between gap-2">
+              <span class="text-gray-600">Start speed duration (s)</span>
+              <input
+                type="number"
+                v-model.number="route.motionProfile.params.start_speed_s"
+                step="0.1"
                 min="0"
                 class="w-24 px-2 py-1 border border-gray-300 rounded text-xs text-right"
               />
