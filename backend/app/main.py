@@ -6,10 +6,10 @@ import time
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.gen_service import run_gen
+from app.jobs import GenJobManager
 from app.schemas import (
     GenRequestPayload,
-    GenResultPayload,
+    GenJobStatusPayload,
     SessionCreatePayload,
     SessionInfoPayload,
 )
@@ -18,6 +18,7 @@ from app.settings import load_settings
 
 settings = load_settings()
 session_store = SessionStore(settings.session_root)
+job_manager = GenJobManager(settings)
 
 app = FastAPI(title="Nav Sim Backend", version="0.1.0")
 
@@ -91,21 +92,71 @@ def delete_session(session_id: str) -> dict:
     return {"status": "deleted", "session_id": session_id}
 
 
-@app.post("/sessions/{session_id}/gen", response_model=GenResultPayload)
-def generate(session_id: str, payload: GenRequestPayload) -> GenResultPayload:
+@app.post("/sessions/{session_id}/gen", response_model=GenJobStatusPayload)
+def generate(session_id: str, payload: GenRequestPayload) -> GenJobStatusPayload:
     info = session_store.get(session_id)
     if not info:
         logger.info("gen.start id=%s status=not_found", session_id)
         raise HTTPException(status_code=404, detail="session not found")
     try:
         logger.info("gen.start id=%s", session_id)
-        motion_path, iq_path = run_gen(payload, info.root, settings)
+        job = job_manager.start(session_id, info.root, payload.model_dump())
     except Exception as exc:
         logger.info("gen.fail id=%s error=%s", session_id, exc)
         raise HTTPException(status_code=400, detail=str(exc)) from exc
-    logger.info("gen.ok id=%s motion=%s iq=%s", session_id, motion_path, iq_path)
-    return GenResultPayload(
-        session_id=session_id,
-        motion_csv=str(motion_path),
-        iq=str(iq_path),
+    logger.info("gen.job id=%s job_id=%s status=%s", session_id, job.job_id, job.status)
+    return GenJobStatusPayload(
+        job_id=job.job_id,
+        session_id=job.session_id,
+        status=job.status.value,
+        created_at=job.created_at,
+        started_at=job.started_at,
+        finished_at=job.finished_at,
+        motion_csv=job.motion_csv,
+        iq=job.iq,
+        error=job.error,
+    )
+
+
+@app.get("/sessions/{session_id}/gen/{job_id}", response_model=GenJobStatusPayload)
+def get_gen_status(session_id: str, job_id: str) -> GenJobStatusPayload:
+    job = job_manager.get(job_id)
+    if not job or job.session_id != session_id:
+        logger.info("gen.status id=%s job_id=%s status=not_found", session_id, job_id)
+        raise HTTPException(status_code=404, detail="job not found")
+    logger.info("gen.status id=%s job_id=%s status=%s", session_id, job_id, job.status)
+    return GenJobStatusPayload(
+        job_id=job.job_id,
+        session_id=job.session_id,
+        status=job.status.value,
+        created_at=job.created_at,
+        started_at=job.started_at,
+        finished_at=job.finished_at,
+        motion_csv=job.motion_csv,
+        iq=job.iq,
+        error=job.error,
+    )
+
+
+@app.post("/sessions/{session_id}/gen/{job_id}/cancel", response_model=GenJobStatusPayload)
+def cancel_gen(session_id: str, job_id: str) -> GenJobStatusPayload:
+    job = job_manager.get(job_id)
+    if not job or job.session_id != session_id:
+        logger.info("gen.cancel id=%s job_id=%s status=not_found", session_id, job_id)
+        raise HTTPException(status_code=404, detail="job not found")
+    job = job_manager.cancel(job_id)
+    if not job:
+        logger.info("gen.cancel id=%s job_id=%s status=not_found", session_id, job_id)
+        raise HTTPException(status_code=404, detail="job not found")
+    logger.info("gen.cancel id=%s job_id=%s status=%s", session_id, job_id, job.status)
+    return GenJobStatusPayload(
+        job_id=job.job_id,
+        session_id=job.session_id,
+        status=job.status.value,
+        created_at=job.created_at,
+        started_at=job.started_at,
+        finished_at=job.finished_at,
+        motion_csv=job.motion_csv,
+        iq=job.iq,
+        error=job.error,
     )

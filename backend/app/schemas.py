@@ -107,3 +107,15 @@ class GenResultPayload(BaseModel):
     session_id: str
     motion_csv: str
     iq: str
+
+
+class GenJobStatusPayload(BaseModel):
+    job_id: str
+    session_id: str
+    status: str
+    created_at: datetime
+    started_at: Optional[datetime] = None
+    finished_at: Optional[datetime] = None
+    motion_csv: Optional[str] = None
+    iq: Optional[str] = None
+    error: Optional[str] = None

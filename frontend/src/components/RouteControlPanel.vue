@@ -44,6 +44,8 @@ const buildProgress = ref({ current: 1, total: 20 })
 const runningTime = ref(32.4)
 const sessionId = ref<string | null>(null)
 const buildAbort = ref<AbortController | null>(null)
+const buildJobId = ref<string | null>(null)
+const buildPollTimer = ref<number | null>(null)
 
 const apiBaseUrl = import.meta.env.VITE_SIM_API_URL || 'http://localhost:8000'
 
@@ -89,6 +91,8 @@ watch(() => props.route, () => {
   if (!buildRunning.value) {
     buildStatus.value = 'outdated'
     sessionId.value = null
+    buildJobId.value = null
+    stopBuildPolling()
   }
 }, { deep: true })
 
@@ -114,6 +118,7 @@ onBeforeUnmount(() => {
     buildAbort.value.abort()
     buildAbort.value = null
   }
+  stopBuildPolling()
 })
 
 async function ensureSession() {
@@ -140,6 +145,53 @@ async function sendGenRequest(id: string, controller: AbortController) {
     signal: controller.signal
   })
   return response
+}
+
+function startBuildPolling() {
+  stopBuildPolling()
+  buildPollTimer.value = window.setInterval(async () => {
+    if (!sessionId.value || !buildJobId.value) return
+    try {
+      const response = await fetch(`${apiBaseUrl}/sessions/${sessionId.value}/gen/${buildJobId.value}`)
+      if (!response.ok) return
+      const job = await response.json()
+      handleBuildJob(job)
+    } catch (err) {
+      console.error('Failed to poll build status:', err)
+    }
+  }, 1000)
+}
+
+function stopBuildPolling() {
+  if (buildPollTimer.value !== null) {
+    window.clearInterval(buildPollTimer.value)
+    buildPollTimer.value = null
+  }
+}
+
+function handleBuildJob(job: any) {
+  buildJobId.value = job.job_id || buildJobId.value
+  switch (job.status) {
+    case 'running':
+    case 'pending':
+      buildStatus.value = 'building'
+      break
+    case 'completed':
+      buildStatus.value = 'completed'
+      stopBuildPolling()
+      break
+    case 'failed':
+      buildStatus.value = 'none'
+      stopBuildPolling()
+      alert(`Build failed: ${job.error || 'Unknown error'}`)
+      break
+    case 'canceled':
+      buildStatus.value = 'none'
+      stopBuildPolling()
+      break
+    default:
+      break
+  }
 }
 
 function buildPayload() {
@@ -191,8 +243,11 @@ async function startBuild() {
       const error = await response.text()
       throw new Error(error || 'Build failed')
     }
-    await response.json()
-    buildStatus.value = 'completed'
+    const job = await response.json()
+    handleBuildJob(job)
+    if (job.status === 'running' || job.status === 'pending') {
+      startBuildPolling()
+    }
   } catch (err: any) {
     if (controller.signal.aborted) {
       buildStatus.value = 'none'
@@ -206,10 +261,21 @@ async function startBuild() {
   }
 }
 
-function cancelBuild() {
+async function cancelBuild() {
   if (buildAbort.value) {
     buildAbort.value.abort()
   }
+  stopBuildPolling()
+  if (sessionId.value && buildJobId.value) {
+    try {
+      await fetch(`${apiBaseUrl}/sessions/${sessionId.value}/gen/${buildJobId.value}/cancel`, {
+        method: 'POST'
+      })
+    } catch (err) {
+      console.error('Failed to cancel build:', err)
+    }
+  }
+  buildJobId.value = null
   buildStatus.value = 'none'
 }
 
