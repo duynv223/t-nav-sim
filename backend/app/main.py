@@ -4,6 +4,8 @@ import asyncio
 import logging
 import time
 
+from pathlib import Path
+
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
@@ -18,12 +20,14 @@ from app.schemas import (
 )
 from app.settings_store import SettingsStore
 from app.session_store import SessionStore
-from app.settings import load_settings
 
-settings = load_settings()
-session_store = SessionStore(settings.session_root)
-job_manager = GenJobManager(settings)
-settings_store = SettingsStore(settings.app_settings_path)
+REPO_DIR = Path(__file__).resolve().parents[2]
+SESSION_ROOT = REPO_DIR / "var" / "sessions"
+SETTINGS_PATH = REPO_DIR / "settings.yaml"
+
+session_store = SessionStore(SESSION_ROOT)
+job_manager = GenJobManager()
+settings_store = SettingsStore(SETTINGS_PATH)
 
 app = FastAPI(title="Nav Sim Backend", version="0.1.0")
 
@@ -104,8 +108,8 @@ def generate(session_id: str, payload: GenRequestPayload) -> GenJobStatusPayload
         raise HTTPException(status_code=404, detail="session not found")
     try:
         logger.info("gen.start id=%s", session_id)
-        iq_settings = settings_store.get().iq_generator.model_dump()
-        job = job_manager.start(session_id, info.root, payload.model_dump(), iq_settings)
+        app_settings = settings_store.get().model_dump()
+        job = job_manager.start(session_id, info.root, payload.model_dump(), app_settings)
     except Exception as exc:
         logger.info("gen.fail id=%s error=%s", session_id, exc)
         raise HTTPException(status_code=400, detail=str(exc)) from exc

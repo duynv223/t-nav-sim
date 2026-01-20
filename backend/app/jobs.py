@@ -9,10 +9,9 @@ from threading import Lock, Thread
 from typing import Any, Dict, Optional
 import uuid
 
-from app.app_settings import IqGeneratorSettings
+from app.app_settings import AppSettings
 from app.gen_service import run_gen
 from app.schemas import GenRequestPayload
-from app.settings import Settings
 
 
 class JobStatus(str, Enum):
@@ -41,29 +40,16 @@ class GenJob:
 def _run_gen_job(
     payload: dict,
     session_root: str,
-    settings_data: dict,
-    iq_settings: dict | None,
+    app_settings_data: dict,
     result_queue: Queue,
 ) -> None:
     try:
         request = GenRequestPayload.model_validate(payload)
-        settings = Settings(
-            session_root=Path(session_root),
-            gps_sdr_sim_path=settings_data["gps_sdr_sim_path"],
-            ephemeris_path=settings_data["ephemeris_path"],
-            iq_bits=settings_data["iq_bits"],
-            iq_sample_rate_hz=settings_data["iq_sample_rate_hz"],
-            enable_iq=settings_data["enable_iq"],
-            app_settings_path=Path(settings_data["app_settings_path"]),
-        )
-        iq_profile = None
-        if iq_settings:
-            iq_profile = IqGeneratorSettings.model_validate(iq_settings)
+        app_settings = AppSettings.model_validate(app_settings_data)
         motion_path, iq_path = run_gen(
             request,
             Path(session_root),
-            settings,
-            iq_settings=iq_profile,
+            app_settings,
         )
         result_queue.put(
             {"status": "ok", "motion_csv": str(motion_path), "iq": str(iq_path)}
@@ -73,8 +59,7 @@ def _run_gen_job(
 
 
 class GenJobManager:
-    def __init__(self, settings: Settings) -> None:
-        self._settings = settings
+    def __init__(self) -> None:
         self._jobs: Dict[str, GenJob] = {}
         self._active_by_session: Dict[str, str] = {}
         self._lock = Lock()
@@ -84,7 +69,7 @@ class GenJobManager:
         session_id: str,
         session_root: Path,
         payload: dict,
-        iq_settings: dict | None = None,
+        app_settings: dict,
     ) -> GenJob:
         with self._lock:
             active_id = self._active_by_session.get(session_id)
@@ -106,18 +91,9 @@ class GenJobManager:
             self._jobs[job_id] = job
             self._active_by_session[session_id] = job_id
 
-            settings_data = {
-                "gps_sdr_sim_path": self._settings.gps_sdr_sim_path,
-                "ephemeris_path": self._settings.ephemeris_path,
-                "iq_bits": self._settings.iq_bits,
-                "iq_sample_rate_hz": self._settings.iq_sample_rate_hz,
-                "enable_iq": self._settings.enable_iq,
-                "app_settings_path": str(self._settings.app_settings_path),
-            }
-
             proc = Process(
                 target=_run_gen_job,
-                args=(payload, str(session_root), settings_data, iq_settings, queue),
+                args=(payload, str(session_root), app_settings, queue),
                 daemon=True,
             )
             job.process = proc

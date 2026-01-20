@@ -4,8 +4,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from shutil import which
 
-from app.app_settings import IqGeneratorSettings
-from app.settings import Settings
+from app.app_settings import AppSettings, IqGeneratorSettings
 from dsim.adapters.iq_gps_sdr_sim import GpsSdrSimConfig, GpsSdrSimIqGenerator
 from dsim.core.models import MotionSample
 from dsim.core.models import Point, Route, SimpleMotionProfile
@@ -18,8 +17,7 @@ from app.schemas import GenRequestPayload, MotionProfileParams
 def run_gen(
     request: GenRequestPayload,
     session_root: Path,
-    settings: Settings,
-    iq_settings: IqGeneratorSettings | None = None,
+    app_settings: AppSettings,
 ) -> tuple[Path, Path]:
     route = _build_route(request.scenario.route.points)
     profile = _build_profile(request.scenario.motion_profile.params)
@@ -28,7 +26,7 @@ def run_gen(
     motion_path = _resolve_output(session_root, outputs.motion_csv, "motion.csv")
     iq_path = _resolve_output(session_root, outputs.iq, "route.iq")
 
-    iq_generator = _select_iq_generator(settings, iq_settings)
+    iq_generator = _select_iq_generator(app_settings)
 
     gen_request = GenRequest(
         route=route,
@@ -91,15 +89,10 @@ class _NullIqGenerator(IqGenerator):
         return str(path)
 
 
-def _select_iq_generator(
-    settings: Settings,
-    iq_settings: IqGeneratorSettings | None,
-) -> IqGenerator:
-    if not settings.enable_iq:
-        return _NullIqGenerator()
-    iq_profile = iq_settings or IqGeneratorSettings()
-    ephemeris_path_value = settings.ephemeris_path
-    gps_sdr_sim_value = settings.gps_sdr_sim_path
+def _select_iq_generator(app_settings: AppSettings) -> IqGenerator:
+    iq_profile = app_settings.iq_generator
+    ephemeris_path_value = _default_ephemeris_path()
+    gps_sdr_sim_value = "gps-sdr-sim"
     ephemeris_path = Path(ephemeris_path_value)
     gps_sdr_sim_path = Path(gps_sdr_sim_value)
     resolved_gps_sdr_sim = None
@@ -116,6 +109,16 @@ def _select_iq_generator(
         iq_bits=iq_profile.iq_bits,
     )
     return GpsSdrSimIqGenerator(iq_config)
+
+
+def _default_ephemeris_path() -> str:
+    try:
+        import dsim
+    except ImportError:
+        base_dir = Path(__file__).resolve().parents[1]
+        return str(base_dir / "assets" / "brdc0010.22n")
+    assets_dir = Path(dsim.__file__).resolve().parent / "assets"
+    return str(assets_dir / "brdc0010.22n")
 
 
 def _resolve_output(session_root: Path, value: str, fallback: str) -> Path:

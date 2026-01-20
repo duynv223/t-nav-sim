@@ -1,6 +1,16 @@
 from __future__ import annotations
 
-from pydantic import BaseModel, Field, root_validator, validator
+import sys
+from pathlib import Path
+
+from pydantic import BaseModel, Field, validator
+
+
+REPO_DIR = Path(__file__).resolve().parents[2]
+DSIM_SRC_DIR = REPO_DIR / "dsim" / "src"
+
+if DSIM_SRC_DIR.exists() and str(DSIM_SRC_DIR) not in sys.path:
+    sys.path.insert(0, str(DSIM_SRC_DIR))
 
 
 class IqGeneratorSettings(BaseModel):
@@ -35,18 +45,3 @@ class AppSettings(BaseModel):
     iq_generator: IqGeneratorSettings = Field(default_factory=IqGeneratorSettings)
     gps_transmitter: GpsTransmitterSettings = Field(default_factory=GpsTransmitterSettings)
     controller: ControllerSettings = Field(default_factory=ControllerSettings)
-
-    @root_validator(pre=True)
-    def _normalize(cls, values: dict) -> dict:
-        if not isinstance(values, dict):
-            return values
-        if "gps" in values and not any(
-            key in values for key in ("iq_generator", "gps_transmitter", "controller")
-        ):
-            gps = values.get("gps") or {}
-            return {
-                "iq_generator": gps.get("iq_generator"),
-                "gps_transmitter": gps.get("gps_transmitter"),
-                "controller": gps.get("controller"),
-            }
-        return values
