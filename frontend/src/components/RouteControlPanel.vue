@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, watch, nextTick, computed } from 'vue'
+import { ref, watch, nextTick, computed, onBeforeUnmount } from 'vue'
 import { Route as MapRoute } from '@/types/route'
 import { MapPinPlus, Trash2, Play, Square, ChevronDown, Download, Upload, LocateFixed, Loader2, Info } from 'lucide-vue-next'
 
@@ -42,6 +42,10 @@ const buildStatus = ref<BuildStatus>('none')
 const runStatus = ref<RunStatus>('idle')
 const buildProgress = ref({ current: 1, total: 20 })
 const runningTime = ref(32.4)
+const sessionId = ref<string | null>(null)
+const buildAbort = ref<AbortController | null>(null)
+
+const apiBaseUrl = import.meta.env.VITE_SIM_API_URL || 'http://localhost:8000'
 
 const buildRunning = computed(() => buildStatus.value === 'building')
 const runDisabled = computed(() => buildRunning.value)
@@ -84,6 +88,7 @@ watch(() => props.route, () => {
   }
   if (!buildRunning.value) {
     buildStatus.value = 'outdated'
+    sessionId.value = null
   }
 }, { deep: true })
 
@@ -103,6 +108,110 @@ watch(buildStartEnabled, (enabled) => {
     buildStartTime.value = formatDateTime(new Date())
   }
 })
+
+onBeforeUnmount(() => {
+  if (buildAbort.value) {
+    buildAbort.value.abort()
+    buildAbort.value = null
+  }
+})
+
+async function ensureSession() {
+  if (sessionId.value) return sessionId.value
+  const response = await fetch(`${apiBaseUrl}/sessions`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ name: props.route.routeId || undefined })
+  })
+  if (!response.ok) {
+    const detail = await response.text()
+    throw new Error(detail || 'Failed to create session')
+  }
+  const data = await response.json()
+  sessionId.value = data.session_id
+  return sessionId.value
+}
+
+async function sendGenRequest(id: string, controller: AbortController) {
+  const response = await fetch(`${apiBaseUrl}/sessions/${id}/gen`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify(buildPayload()),
+    signal: controller.signal
+  })
+  return response
+}
+
+function buildPayload() {
+  const scenario = {
+    meta: {
+      name: props.route.routeId || undefined
+    },
+    route: {
+      points: props.route.points.map(p => ({ lat: p.lat, lon: p.lon }))
+    },
+    motion_profile: {
+      type: props.route.motionProfile.type,
+      params: props.route.motionProfile.params
+    }
+  }
+  return {
+    schema_version: 1,
+    scenario,
+    dt_s: 0.1,
+    start_time: buildStartEnabled.value ? buildStartTime.value : undefined,
+    outputs: {
+      motion_csv: 'motion.csv',
+      iq: 'route.iq'
+    }
+  }
+}
+
+async function startBuild() {
+  if (buildRunning.value) return
+  if (props.route.points.length < 2) {
+    alert('Add at least two points')
+    return
+  }
+  buildStatus.value = 'building'
+  buildProgress.value = { current: 1, total: 1 }
+
+  const controller = new AbortController()
+  buildAbort.value = controller
+
+  try {
+    let id = await ensureSession()
+    let response = await sendGenRequest(id, controller)
+    if (response.status === 404) {
+      sessionId.value = null
+      id = await ensureSession()
+      response = await sendGenRequest(id, controller)
+    }
+    if (!response.ok) {
+      const error = await response.text()
+      throw new Error(error || 'Build failed')
+    }
+    await response.json()
+    buildStatus.value = 'completed'
+  } catch (err: any) {
+    if (controller.signal.aborted) {
+      buildStatus.value = 'none'
+      return
+    }
+    console.error('Build failed:', err)
+    alert(`Build failed: ${err?.message || err}`)
+    buildStatus.value = 'none'
+  } finally {
+    buildAbort.value = null
+  }
+}
+
+function cancelBuild() {
+  if (buildAbort.value) {
+    buildAbort.value.abort()
+  }
+  buildStatus.value = 'none'
+}
 
 function handleClear() {
   showClearConfirm.value = true
@@ -662,8 +771,10 @@ function formatSegmentDistance(seg: { from: number; to: number }) {
 
         <div class="mt-3">
           <button
+            @click="buildRunning ? cancelBuild() : startBuild()"
+            :disabled="route.points.length < 2 && !buildRunning"
             class="inline-flex items-center gap-2 px-3 py-2 rounded-md text-xs font-medium border transition-colors"
-            :class="buildRunning ? 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50' : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'"
+            :class="route.points.length < 2 && !buildRunning ? 'bg-gray-50 text-gray-300 border-gray-200 cursor-not-allowed' : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'"
             title="Toggle build">
             <component :is="buildRunning ? Square : Play" :size="14" />
             <span>{{ buildRunning ? 'Cancel' : 'Build' }}</span>
