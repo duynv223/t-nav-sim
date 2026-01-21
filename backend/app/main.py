@@ -1,8 +1,10 @@
 from __future__ import annotations
 
 import asyncio
+import json
 import logging
 import time
+import queue
 
 from pathlib import Path
 
@@ -13,9 +15,12 @@ from fastapi.responses import StreamingResponse
 from app.app_settings import AppSettings
 from app.jobs import GenJobManager, JobStatus
 from app.logger import configure_logging
+from app.run_jobs import RunJobManager
 from app.schemas import (
     GenRequestPayload,
     GenJobStatusPayload,
+    RunJobStatusPayload,
+    RunRequestPayload,
     SessionCreatePayload,
     SessionInfoPayload,
 )
@@ -28,6 +33,7 @@ SETTINGS_PATH = REPO_DIR / "settings.yaml"
 
 session_store = SessionStore(SESSION_ROOT)
 job_manager = GenJobManager()
+run_job_manager = RunJobManager()
 settings_store = SettingsStore(SETTINGS_PATH)
 
 configure_logging()
@@ -142,6 +148,62 @@ def cancel_gen(session_id: str, job_id: str) -> GenJobStatusPayload:
     return _job_payload(job)
 
 
+@app.post("/sessions/{session_id}/run", response_model=RunJobStatusPayload)
+def start_run(session_id: str, payload: RunRequestPayload) -> RunJobStatusPayload:
+    info = session_store.get(session_id)
+    if not info:
+        logger.info("run.start id=%s status=not_found", session_id)
+        raise HTTPException(status_code=404, detail="session not found")
+    try:
+        logger.info("run.start id=%s", session_id)
+        app_settings = settings_store.get().model_dump()
+        job = run_job_manager.start(session_id, info.root, payload.model_dump(), app_settings)
+    except Exception as exc:
+        logger.info("run.fail id=%s error=%s", session_id, exc)
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    logger.info("run.job id=%s job_id=%s status=%s", session_id, job.job_id, job.status)
+    return _run_job_payload(job)
+
+
+@app.get("/sessions/{session_id}/run/{job_id}", response_model=RunJobStatusPayload)
+def get_run_status(session_id: str, job_id: str) -> RunJobStatusPayload:
+    job = run_job_manager.get(job_id)
+    if not job or job.session_id != session_id:
+        logger.info("run.status id=%s job_id=%s status=not_found", session_id, job_id)
+        raise HTTPException(status_code=404, detail="job not found")
+    logger.info("run.status id=%s job_id=%s status=%s", session_id, job_id, job.status)
+    return _run_job_payload(job)
+
+
+@app.post("/sessions/{session_id}/run/{job_id}/cancel", response_model=RunJobStatusPayload)
+def cancel_run(session_id: str, job_id: str) -> RunJobStatusPayload:
+    job = run_job_manager.get(job_id)
+    if not job or job.session_id != session_id:
+        logger.info("run.cancel id=%s job_id=%s status=not_found", session_id, job_id)
+        raise HTTPException(status_code=404, detail="job not found")
+    job = run_job_manager.cancel(job_id)
+    if not job:
+        logger.info("run.cancel id=%s job_id=%s status=not_found", session_id, job_id)
+        raise HTTPException(status_code=404, detail="job not found")
+    logger.info("run.cancel id=%s job_id=%s status=%s", session_id, job_id, job.status)
+    return _run_job_payload(job)
+
+
+@app.get("/sessions/{session_id}/run/{job_id}/events")
+async def stream_run_events(session_id: str, job_id: str, request: Request) -> StreamingResponse:
+    job = run_job_manager.get(job_id)
+    if not job or job.session_id != session_id:
+        logger.info("run.events id=%s job_id=%s status=not_found", session_id, job_id)
+        raise HTTPException(status_code=404, detail="job not found")
+    logger.info("run.events id=%s job_id=%s status=connected", session_id, job_id)
+    generator = _run_job_events(request, session_id, job_id)
+    headers = {
+        "Cache-Control": "no-cache",
+        "Connection": "keep-alive",
+    }
+    return StreamingResponse(generator, media_type="text/event-stream", headers=headers)
+
+
 @app.get("/settings", response_model=AppSettings)
 def get_settings() -> AppSettings:
     logger.info("settings.get status=ok")
@@ -184,6 +246,20 @@ def _job_payload(job) -> GenJobStatusPayload:
     )
 
 
+def _run_job_payload(job) -> RunJobStatusPayload:
+    return RunJobStatusPayload(
+        job_id=job.job_id,
+        session_id=job.session_id,
+        status=job.status.value,
+        created_at=job.created_at,
+        started_at=job.started_at,
+        finished_at=job.finished_at,
+        motion_csv=job.motion_csv,
+        iq=job.iq,
+        error=job.error,
+    )
+
+
 async def _gen_job_events(request: Request, session_id: str, job_id: str):
     last_status = None
     last_ping = time.monotonic()
@@ -212,3 +288,48 @@ async def _gen_job_events(request: Request, session_id: str, job_id: str):
             last_ping = now
 
         await asyncio.sleep(0.5)
+
+
+async def _run_job_events(request: Request, session_id: str, job_id: str):
+    last_status = None
+    last_ping = time.monotonic()
+    terminal_states = {"completed", "failed", "canceled"}
+
+    while True:
+        if await request.is_disconnected():
+            logger.info("run.events id=%s job_id=%s status=disconnected", session_id, job_id)
+            break
+        job = run_job_manager.get(job_id)
+        if not job:
+            logger.info("run.events id=%s job_id=%s status=missing", session_id, job_id)
+            break
+
+        latest_telemetry = None
+        if job.event_buffer:
+            while True:
+                try:
+                    event = job.event_buffer.get_nowait()
+                except queue.Empty:
+                    break
+                if not event:
+                    continue
+                if event.get("event") == "telemetry":
+                    latest_telemetry = event.get("data") or {}
+
+        if latest_telemetry is not None:
+            yield f"event: telemetry\ndata: {json.dumps(latest_telemetry)}\n\n"
+
+        if job.status.value != last_status:
+            payload = _run_job_payload(job).model_dump_json()
+            yield f"event: status\ndata: {payload}\n\n"
+            last_status = job.status.value
+
+        if job.status.value in terminal_states and (not job.event_buffer or job.event_buffer.empty()):
+            break
+
+        now = time.monotonic()
+        if now - last_ping >= 10:
+            yield ": ping\n\n"
+            last_ping = now
+
+        await asyncio.sleep(0.2)

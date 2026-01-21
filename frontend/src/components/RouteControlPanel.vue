@@ -9,6 +9,7 @@ const props = defineProps<{
   telemetry: any
   simState: 'idle' | 'running' | 'paused' | 'stopped'
   simStatus: { stage: string; detail?: string } | null
+  onTelemetryUpdate: (telemetry: any) => void
   onModeChange: (mode: 'view' | 'add') => void
   onReset: () => void
   onRun: () => void
@@ -46,10 +47,13 @@ const sessionId = ref<string | null>(null)
 const buildAbort = ref<AbortController | null>(null)
 const buildJobId = ref<string | null>(null)
 const buildEventSource = ref<EventSource | null>(null)
+const runJobId = ref<string | null>(null)
+const runEventSource = ref<EventSource | null>(null)
 
 const apiBaseUrl = import.meta.env.VITE_SIM_API_URL || 'http://localhost:8000'
 
 const buildRunning = computed(() => buildStatus.value === 'building')
+const runActive = computed(() => runStatus.value === 'running' || runStatus.value === 'waiting' || runStatus.value === 'building')
 const runDisabled = computed(() => buildRunning.value)
 
 const buildStatusLabel = computed(() => {
@@ -93,6 +97,9 @@ watch(() => props.route, () => {
     sessionId.value = null
     buildJobId.value = null
     stopBuildEvents()
+    runStatus.value = 'idle'
+    runJobId.value = null
+    stopRunEvents()
   }
 }, { deep: true })
 
@@ -119,6 +126,7 @@ onBeforeUnmount(() => {
     buildAbort.value = null
   }
   stopBuildEvents()
+  stopRunEvents()
 })
 
 async function ensureSession() {
@@ -296,6 +304,156 @@ async function cancelBuild() {
   }
   buildJobId.value = null
   buildStatus.value = 'none'
+}
+
+async function sendRunRequest(id: string) {
+  const payload = {
+    motion_csv: 'motion.csv',
+    iq: 'route.iq',
+    realtime: realtime.value,
+    start_time: realtime.value ? runStartTime.value : undefined,
+    gps_only: gpsOnly.value
+  }
+  const response = await fetch(`${apiBaseUrl}/sessions/${id}/run`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify(payload)
+  })
+  return response
+}
+
+function startRunEvents() {
+  stopRunEvents()
+  if (!sessionId.value || !runJobId.value) return
+  const url = `${apiBaseUrl}/sessions/${sessionId.value}/run/${runJobId.value}/events`
+  const source = new EventSource(url)
+  runEventSource.value = source
+
+  const handleStatus = (event: MessageEvent) => {
+    try {
+      const job = JSON.parse(event.data)
+      handleRunJob(job)
+    } catch (err) {
+      console.error('Failed to parse run status:', err)
+    }
+  }
+
+  const handleTelemetry = (event: MessageEvent) => {
+    try {
+      const data = JSON.parse(event.data)
+      handleRunTelemetry(data)
+    } catch (err) {
+      console.error('Failed to parse telemetry:', err)
+    }
+  }
+
+  source.addEventListener('status', handleStatus as EventListener)
+  source.addEventListener('telemetry', handleTelemetry as EventListener)
+  source.onerror = () => {
+    if (runEventSource.value !== source) return
+    if (source.readyState === EventSource.CLOSED) {
+      runEventSource.value = null
+    }
+  }
+}
+
+function stopRunEvents() {
+  if (runEventSource.value) {
+    runEventSource.value.close()
+    runEventSource.value = null
+  }
+}
+
+function handleRunJob(job: any) {
+  runJobId.value = job.job_id || runJobId.value
+  switch (job.status) {
+    case 'waiting':
+      runStatus.value = 'waiting'
+      break
+    case 'running':
+      runStatus.value = 'running'
+      break
+    case 'pending':
+      runStatus.value = 'building'
+      break
+    case 'completed':
+      runStatus.value = 'idle'
+      stopRunEvents()
+      runJobId.value = null
+      break
+    case 'failed':
+      runStatus.value = 'idle'
+      stopRunEvents()
+      runJobId.value = null
+      alert(`Run failed: ${job.error || 'Unknown error'}`)
+      break
+    case 'canceled':
+      runStatus.value = 'idle'
+      stopRunEvents()
+      runJobId.value = null
+      break
+    default:
+      break
+  }
+}
+
+function handleRunTelemetry(data: any) {
+  const payload = {
+    t: data.t ?? data.t_s,
+    lat: data.lat,
+    lon: data.lon,
+    speed: data.speed_kmh ?? data.speed_mps ?? data.speed,
+    bearing: data.bearing ?? data.bearing_deg
+  }
+  if (typeof payload.t === 'number') {
+    runningTime.value = payload.t
+  }
+  props.onTelemetryUpdate(payload)
+}
+
+async function startRun() {
+  if (runActive.value) return
+  if (buildStatus.value !== 'completed') {
+    alert('Build simulation data first')
+    return
+  }
+  if (!sessionId.value) {
+    alert('No session available. Build first.')
+    return
+  }
+  runStatus.value = 'building'
+  runningTime.value = 0
+  try {
+    const response = await sendRunRequest(sessionId.value)
+    if (!response.ok) {
+      const error = await response.text()
+      throw new Error(error || 'Run failed')
+    }
+    const job = await response.json()
+    handleRunJob(job)
+    if (job.status === 'running' || job.status === 'waiting' || job.status === 'pending') {
+      startRunEvents()
+    }
+  } catch (err: any) {
+    console.error('Run failed:', err)
+    alert(`Run failed: ${err?.message || err}`)
+    runStatus.value = 'idle'
+  }
+}
+
+async function cancelRun() {
+  stopRunEvents()
+  if (sessionId.value && runJobId.value) {
+    try {
+      await fetch(`${apiBaseUrl}/sessions/${sessionId.value}/run/${runJobId.value}/cancel`, {
+        method: 'POST'
+      })
+    } catch (err) {
+      console.error('Failed to cancel run:', err)
+    }
+  }
+  runJobId.value = null
+  runStatus.value = 'idle'
 }
 
 function handleClear() {
@@ -929,11 +1087,13 @@ function formatSegmentDistance(seg: { from: number; to: number }) {
 
         <div class="mt-3">
           <button
+            @click="runActive ? cancelRun() : startRun()"
+            :disabled="(!runActive && buildStatus !== 'completed') || runDisabled"
             class="inline-flex items-center gap-2 px-3 py-2 rounded-md text-xs font-medium border transition-colors"
-            :class="runStatus === 'running' ? 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50' : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'"
+            :class="(!runActive && buildStatus !== 'completed') || runDisabled ? 'bg-gray-50 text-gray-300 border-gray-200 cursor-not-allowed' : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'"
             title="Toggle run">
-            <component :is="runStatus === 'running' ? Square : Play" :size="14" />
-            <span>{{ runStatus === 'running' ? 'Stop' : 'Run' }}</span>
+            <component :is="runActive ? Square : Play" :size="14" />
+            <span>{{ runActive ? 'Stop' : 'Run' }}</span>
           </button>
         </div>
       </div>

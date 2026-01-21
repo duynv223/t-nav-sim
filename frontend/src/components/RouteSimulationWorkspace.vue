@@ -9,6 +9,7 @@ defineProps<{
   telemetry: any
   simState: 'idle' | 'running' | 'paused' | 'stopped'
   simStatus: { stage: string; detail?: string } | null
+  onTelemetryUpdate: (telemetry: any) => void
   onModeChange: (mode: 'view' | 'add') => void
   onReset: () => void
   onRun: () => void
@@ -33,6 +34,7 @@ defineProps<{
       :telemetry="telemetry"
       :simState="simState"
       :simStatus="simStatus"
+      :onTelemetryUpdate="onTelemetryUpdate"
       :onModeChange="onModeChange"
       :onReset="onReset"
       :onRun="onRun"

@@ -20,6 +20,7 @@
         :telemetry="telemetry"
         :simState="simState"
         :simStatus="simStatus"
+        :onTelemetryUpdate="updateTelemetry"
         :onModeChange="(newMode) => mode = newMode"
         :onReset="resetRoute"
         :onRun="runSim"
@@ -206,6 +207,10 @@ function stopSim(){
 
 function resetRoute(){
   route.value = new Route()
+}
+
+function updateTelemetry(next: any) {
+  telemetry.value = next
 }
 
 // expose to MapView
