@@ -13,19 +13,21 @@
 - [ ] Show running progress as **current/total**  
   Example: `Running (12/70)`
 
-- [ ] Only show **heading marker** in **Simulation** state  
-  - Remove marker when exiting Simulation
-
 - [ ] Support detailed **Build progress** *(parse `gps-sdr-sim` logs)*
 
-- [ ] Add **GPS Monitor** section to **Simulation** *(using u-blox)*
-
-- [ ] Add Speed Bearing Control Dashboard
+- [ ] Only show **heading marker** in **Simulation** state  
+  - Remove marker when exiting Simulation
 
 - [ ] **Bug fix:** Stop Run → Re-run shows **"no device"**  
   Possible cause: `hackrf_transfer` not fully stopped when stopping Run
 
 - [ ] Add placehodler for Advance motion profile
 
-- [ ] Update frontend for tab name and icon
+- [x] Update frontend for tab name and icon
 
+Next Features:
+- [ ] Add **GPS Monitor** section to **Simulation** *(using u-blox)*
+
+- [ ] Add Speed Bearing Control Dashboard
+
+- [ ] Support import nmeagen coordinate points (csv)
