@@ -51,10 +51,10 @@ function selectTab(tab: string) {
               <SidebarMenuButton 
                 :is-active="activeTab === 'simulation'"
                 @click="selectTab('simulation')"
-                :title="'Simulation'"
+                :title="'Route Simulation'"
               >
                 <Car class="size-4" />
-                <span>Simulation</span>
+                <span>Route Simulation</span>
               </SidebarMenuButton>
             </SidebarMenuItem>
             <SidebarMenuItem>
