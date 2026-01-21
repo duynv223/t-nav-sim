@@ -7,8 +7,6 @@
         <SidebarTrigger class="-ml-1" />
         <div class="flex items-center gap-2">
           <span class="text-sm font-medium text-gray-900">{{ workspaceTitle }}</span>
-          <span class="text-xs text-gray-400">•</span>
-          <span class="text-xs text-gray-500">Simulator v1.0</span>
         </div>
       </header>
       

@@ -35,7 +35,7 @@ function selectTab(tab: string) {
               <Car class="size-4" />
             </div>
             <div class="grid flex-1 text-left text-sm leading-tight">
-              <span class="truncate font-semibold">Simulator</span>
+              <span class="truncate font-semibold">Dsim</span>
               <span class="truncate text-xs">v1.0</span>
             </div>
           </SidebarMenuButton>
