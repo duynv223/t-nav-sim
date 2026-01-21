@@ -20,6 +20,8 @@
 
 - [ ] Add **GPS Monitor** section to **Simulation** *(using u-blox)*
 
+- [ ] Add Speed Bearing Control Dashboard
+
 - [ ] **Bug fix:** Stop Run → Re-run shows **"no device"**  
   Possible cause: `hackrf_transfer` not fully stopped when stopping Run
 
