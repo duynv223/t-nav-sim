@@ -60,12 +60,15 @@ const workspaceTitle = computed(() => {
     default: return 'Simulator'
   }
 })
-
 const route = ref(new Route())
 const telemetry = ref<any>({})
 const mode = ref<'view'|'add'>('view')
 const simState = ref<'idle' | 'running' | 'paused' | 'stopped'>('idle')
 const simStatus = ref<{ stage: string; detail?: string } | null>(null)
+const tabTitle = computed(() => {
+  const name = route.value.routeId?.trim() || 'Untitled Route'
+  return `Dsim - ${name}`
+})
 const ROUTE_STORAGE_KEY = 'navsim.route'
 let restoringRoute = false
 const isMapReady = ref(false)
@@ -104,6 +107,10 @@ watch(route, () => {
   if (restoringRoute) return
   persistRouteToStorage()
 }, { deep: true })
+
+watch(tabTitle, (title) => {
+  document.title = title
+}, { immediate: true })
 
 // Handle load-route event from RouteControlPanel
 function handleLoadRoute(event: CustomEvent) {
