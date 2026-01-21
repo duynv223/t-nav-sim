@@ -22,3 +22,8 @@
 
 - [ ] **Bug fix:** Stop Run → Re-run shows **"no device"**  
   Possible cause: `hackrf_transfer` not fully stopped when stopping Run
+
+- [ ] Add placehodler for Advance motion profile
+
+- [ ] Update frontend for tab name and icon
+
