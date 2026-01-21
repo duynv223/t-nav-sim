@@ -5,6 +5,8 @@ from datetime import datetime, timezone
 from enum import Enum
 from multiprocessing import Process, Queue
 from pathlib import Path
+import os
+import subprocess
 from threading import Lock, Thread
 from typing import Any, Dict, Optional
 import uuid
@@ -180,6 +182,24 @@ class GenJobManager:
             job.finished_at = datetime.now(timezone.utc)
             self._active_by_session.pop(job.session_id, None)
             if job.process and job.process.is_alive():
-                job.process.terminate()
+                _terminate_process_tree(job.process.pid)
             logger.info("gen.cancel session_id=%s job_id=%s", job.session_id, job.job_id)
             return job
+
+
+def _terminate_process_tree(pid: int) -> None:
+    if os.name == "nt":
+        try:
+            subprocess.run(
+                ["taskkill", "/F", "/T", "/PID", str(pid)],
+                check=False,
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+            )
+        except Exception:
+            logger.exception("Failed to taskkill pid=%s", pid)
+        return
+    try:
+        os.kill(pid, 15)
+    except Exception:
+        logger.exception("Failed to terminate pid=%s", pid)
