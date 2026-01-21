@@ -209,26 +209,22 @@ def generate_motion_samples(
                 )
             )
 
-        if turn_in_place:
-            speed_mps = 1/3.6
-            remaining = turn_angle
-            direction = 1.0 if turn_delta >= 0.0 else -1.0
-            turn_bearing = bearing
+        if turn_in_place and next_bearing is not None:
+            speed_mps = 0.0
+            remaining = turn_angle / turn_rate_deg_s
             while remaining > 0.0:
-                step_angle = min(turn_rate_deg_s * dt_s, remaining)
-                step_dt = step_angle / turn_rate_deg_s
+                step_dt = min(dt_s, remaining)
                 t_s += step_dt
-                turn_bearing = (turn_bearing + direction * step_angle) % 360.0
                 samples.append(
                     MotionSample(
                         t_s=t_s,
                         lat=end.lat,
                         lon=end.lon,
-                        speed_mps=1/3.6,
-                        bearing_deg=turn_bearing,
+                        speed_mps=0.0,
+                        bearing_deg=next_bearing,
                         alt_m=end.alt_m,
                     )
                 )
-                remaining -= step_angle
+                remaining -= step_dt
 
     return samples
