@@ -167,6 +167,14 @@ type StoredSimState = {
   gpsOnly: boolean
 }
 
+function formatNumber(value: unknown, decimals: number) {
+  const numeric = typeof value === 'number' ? value : Number(value)
+  if (!Number.isFinite(numeric)) {
+    return '-'
+  }
+  return numeric.toFixed(decimals)
+}
+
 function readSimState(): StoredSimState | null {
   const raw = sessionStorage.getItem(SESSION_STORAGE_KEY)
   if (!raw) return null
@@ -1241,24 +1249,24 @@ function formatSegmentDistance(seg: { from: number; to: number }) {
         </h4>
         <div class="space-y-1 text-xs">
           <div class="flex justify-between">
-            <span class="text-gray-600">t:</span>
-            <span class="font-mono">{{ telemetry.t ?? '-' }}</span>
+            <span class="text-gray-600">Time (s)</span>
+            <span class="font-mono">{{ formatNumber(telemetry.t, 1) }}</span>
           </div>
           <div class="flex justify-between">
-            <span class="text-gray-600">lat:</span>
-            <span class="font-mono">{{ telemetry.lat ?? '-' }}</span>
+            <span class="text-gray-600">Latitude (deg)</span>
+            <span class="font-mono">{{ formatNumber(telemetry.lat, 7) }}</span>
           </div>
           <div class="flex justify-between">
-            <span class="text-gray-600">lon:</span>
-            <span class="font-mono">{{ telemetry.lon ?? '-' }}</span>
+            <span class="text-gray-600">Longitude (deg)</span>
+            <span class="font-mono">{{ formatNumber(telemetry.lon, 7) }}</span>
           </div>
           <div class="flex justify-between">
-            <span class="text-gray-600">speed:</span>
-            <span class="font-mono">{{ telemetry.speed ?? '-' }}</span>
+            <span class="text-gray-600">Speed (km/h)</span>
+            <span class="font-mono">{{ formatNumber(telemetry.speed, 1) }}</span>
           </div>
           <div class="flex justify-between">
-            <span class="text-gray-600">bearing:</span>
-            <span class="font-mono">{{ telemetry.bearing ?? '-' }}</span>
+            <span class="text-gray-600">Bearing (deg)</span>
+            <span class="font-mono">{{ formatNumber(telemetry.bearing, 1) }}</span>
           </div>
         </div>
       </div>

@@ -1,6 +1,6 @@
 ## TODO
 
-- [ ] **Current Motion**
+- [x] **Current Motion**
   - Update parameter labels to be clearer
   - Apply fixed parameter formatting *(t: .1, lat/lon: .7, speed: .1, bearing: .1)*
 
