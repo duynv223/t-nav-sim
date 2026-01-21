@@ -5,4 +5,5 @@ param(
   [string]$LogLevel = "info"
 )
 
+$env:SIM_LOG_LEVEL = $LogLevel
 python -m uvicorn app.main:app --host $ListenHost --port $Port --workers $Workers --log-level $LogLevel

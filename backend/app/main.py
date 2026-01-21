@@ -12,6 +12,7 @@ from fastapi.responses import StreamingResponse
 
 from app.app_settings import AppSettings
 from app.jobs import GenJobManager, JobStatus
+from app.logger import configure_logging
 from app.schemas import (
     GenRequestPayload,
     GenJobStatusPayload,
@@ -29,10 +30,10 @@ session_store = SessionStore(SESSION_ROOT)
 job_manager = GenJobManager()
 settings_store = SettingsStore(SETTINGS_PATH)
 
-app = FastAPI(title="Nav Sim Backend", version="0.1.0")
-
+configure_logging()
 logger = logging.getLogger("sim.api")
-logger.setLevel(logging.INFO)
+
+app = FastAPI(title="Nav Sim Backend", version="0.1.0")
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
