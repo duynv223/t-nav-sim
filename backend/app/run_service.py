@@ -152,7 +152,6 @@ def _build_motion_cb(event_queue: Queue):
 
     def _on_motion(sample: MotionSample) -> None:
         nonlocal last_sent
-        print("on_motion", sample)
         if sample.t_s <= last_sent:
             return
         last_sent = sample.t_s
