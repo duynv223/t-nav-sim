@@ -32,6 +32,7 @@ class GenJob:
     session_id: str
     status: JobStatus
     created_at: datetime
+    output_root: Optional[Path] = None
     started_at: Optional[datetime] = None
     finished_at: Optional[datetime] = None
     motion_csv: Optional[str] = None
@@ -103,9 +104,11 @@ class GenJobManager:
                 status=JobStatus.PENDING,
                 created_at=now,
                 queue=queue,
+                output_root=session_root / "out",
             )
             self._jobs[job_id] = job
             self._active_by_session[session_id] = job_id
+            _cleanup_temp_outputs(job.output_root)
 
             proc = Process(
                 target=_run_gen_job,
@@ -144,6 +147,7 @@ class GenJobManager:
         with self._lock:
             if job.status == JobStatus.CANCELED:
                 self._active_by_session.pop(job.session_id, None)
+                _cleanup_temp_outputs(job.output_root)
                 logger.info("gen.done session_id=%s job_id=%s status=canceled", job.session_id, job.job_id)
                 return
             if result and result.get("status") == "ok":
@@ -158,6 +162,7 @@ class GenJobManager:
             else:
                 job.status = JobStatus.FAILED
                 job.error = (result or {}).get("error") or "job failed"
+                _cleanup_temp_outputs(job.output_root)
                 logger.info(
                     "gen.done session_id=%s job_id=%s status=failed error=%s",
                     job.session_id,
@@ -183,6 +188,7 @@ class GenJobManager:
             self._active_by_session.pop(job.session_id, None)
             if job.process and job.process.is_alive():
                 _terminate_process_tree(job.process.pid)
+            _cleanup_temp_outputs(job.output_root)
             logger.info("gen.cancel session_id=%s job_id=%s", job.session_id, job.job_id)
             return job
 
@@ -203,3 +209,16 @@ def _terminate_process_tree(pid: int) -> None:
         os.kill(pid, 15)
     except Exception:
         logger.exception("Failed to terminate pid=%s", pid)
+
+
+def _cleanup_temp_outputs(output_root: Optional[Path]) -> None:
+    if not output_root or not output_root.exists():
+        return
+    try:
+        for path in output_root.rglob("*.tmp"):
+            try:
+                path.unlink()
+            except Exception:
+                logger.exception("Failed to delete temp output: %s", path)
+    except Exception:
+        logger.exception("Failed to cleanup temp outputs in %s", output_root)

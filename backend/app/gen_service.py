@@ -34,6 +34,8 @@ def run_gen(
     outputs = request.outputs
     motion_path = _resolve_output(session_root, outputs.motion_csv, "motion.csv")
     iq_path = _resolve_output(session_root, outputs.iq, "route.iq")
+    motion_tmp = _with_tmp_suffix(motion_path)
+    iq_tmp = _with_tmp_suffix(iq_path)
 
     iq_generator = _select_iq_generator(app_settings)
 
@@ -42,13 +44,19 @@ def run_gen(
         profile=profile,
         dt_s=request.dt_s,
         start_time=_format_start_time(request.start_time),
-        iq_route_path=str(iq_path),
-        samples_path=str(motion_path),
+        iq_route_path=str(iq_tmp),
+        samples_path=str(motion_tmp),
     )
-
-    generate_artifacts(gen_request, iq_generator=iq_generator)
-    logger.info("gen.run.done motion_csv=%s iq=%s", motion_path, iq_path)
-    return motion_path, iq_path
+    try:
+        generate_artifacts(gen_request, iq_generator=iq_generator)
+        _promote_output(motion_tmp, motion_path)
+        _promote_output(iq_tmp, iq_path)
+        logger.info("gen.run.done motion_csv=%s iq=%s", motion_path, iq_path)
+        return motion_path, iq_path
+    except Exception:
+        _cleanup_temp(motion_tmp)
+        _cleanup_temp(iq_tmp)
+        raise
 
 
 def _build_route(points: list) -> Route:
@@ -147,6 +155,28 @@ def _resolve_output(session_root: Path, value: str, fallback: str) -> Path:
     output_path = (session_root / "out" / path).resolve()
     output_path.parent.mkdir(parents=True, exist_ok=True)
     return output_path
+
+
+def _with_tmp_suffix(path: Path) -> Path:
+    suffix = path.suffix
+    if suffix:
+        return path.with_suffix(f"{suffix}.tmp")
+    return path.with_suffix(".tmp")
+
+
+def _cleanup_temp(path: Path) -> None:
+    try:
+        if path.exists():
+            path.unlink()
+    except Exception:
+        logger.exception("Failed to cleanup temp output: %s", path)
+
+
+def _promote_output(temp_path: Path, final_path: Path) -> None:
+    if not temp_path.exists():
+        return
+    final_path.parent.mkdir(parents=True, exist_ok=True)
+    temp_path.replace(final_path)
 
 
 def _format_start_time(value: str | None) -> str | None:
