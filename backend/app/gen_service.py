@@ -3,8 +3,9 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from pathlib import Path
 from shutil import which
+import logging
 
-from app.app_settings import AppSettings, IqGeneratorSettings
+from app.app_settings import AppSettings
 from dsim.adapters.iq_gps_sdr_sim import GpsSdrSimConfig, GpsSdrSimIqGenerator
 from dsim.core.models import MotionSample
 from dsim.core.models import Point, Route, SimpleMotionProfile
@@ -13,12 +14,20 @@ from dsim.core.use_cases.gen import GenRequest, generate_artifacts
 
 from app.schemas import GenRequestPayload, MotionProfileParams
 
+logger = logging.getLogger("sim.gen")
+
 
 def run_gen(
     request: GenRequestPayload,
     session_root: Path,
     app_settings: AppSettings,
 ) -> tuple[Path, Path]:
+    logger.info(
+        "gen.run points=%d dt_s=%.3f start_time=%s",
+        len(request.scenario.route.points),
+        request.dt_s,
+        request.start_time or "-",
+    )
     route = _build_route(request.scenario.route.points)
     profile = _build_profile(request.scenario.motion_profile.params)
 
@@ -38,6 +47,7 @@ def run_gen(
     )
 
     generate_artifacts(gen_request, iq_generator=iq_generator)
+    logger.info("gen.run.done motion_csv=%s iq=%s", motion_path, iq_path)
     return motion_path, iq_path
 
 
@@ -101,6 +111,11 @@ def _select_iq_generator(app_settings: AppSettings) -> IqGenerator:
     else:
         resolved_gps_sdr_sim = which(gps_sdr_sim_value)
     if not ephemeris_path.exists() or not resolved_gps_sdr_sim:
+        logger.warning(
+            "gen.run.iq_disabled ephemeris=%s gps_sdr_sim=%s",
+            ephemeris_path_value,
+            gps_sdr_sim_value,
+        )
         return _NullIqGenerator()
     iq_config = GpsSdrSimConfig(
         ephemeris_path=str(ephemeris_path),

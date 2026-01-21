@@ -8,10 +8,12 @@ from pathlib import Path
 from threading import Lock, Thread
 from typing import Any, Dict, Optional
 import uuid
+import logging
 
 from app.app_settings import AppSettings
 from app.gen_service import run_gen
 from app.schemas import GenRequestPayload
+from app.logger import configure_logging
 
 
 class JobStatus(str, Enum):
@@ -37,13 +39,18 @@ class GenJob:
     queue: Optional[Queue] = None
 
 
+logger = logging.getLogger("sim.jobs")
+
+
 def _run_gen_job(
     payload: dict,
     session_root: str,
     app_settings_data: dict,
     result_queue: Queue,
 ) -> None:
+    configure_logging()
     try:
+        logger.info("gen.worker.start session_root=%s", session_root)
         request = GenRequestPayload.model_validate(payload)
         app_settings = AppSettings.model_validate(app_settings_data)
         motion_path, iq_path = run_gen(
@@ -51,10 +58,12 @@ def _run_gen_job(
             Path(session_root),
             app_settings,
         )
+        logger.info("gen.worker.done motion_csv=%s iq=%s", motion_path, iq_path)
         result_queue.put(
             {"status": "ok", "motion_csv": str(motion_path), "iq": str(iq_path)}
         )
     except Exception as exc:
+        logger.exception("gen.worker.failed error=%s", exc)
         result_queue.put({"status": "error", "error": str(exc)})
 
 
@@ -76,6 +85,11 @@ class GenJobManager:
             if active_id:
                 active_job = self._jobs.get(active_id)
                 if active_job and active_job.status in {JobStatus.PENDING, JobStatus.RUNNING}:
+                    logger.info(
+                        "gen.start session_id=%s status=existing job_id=%s",
+                        session_id,
+                        active_id,
+                    )
                     return active_job
 
             job_id = self._next_job_id()
@@ -100,6 +114,7 @@ class GenJobManager:
             job.status = JobStatus.RUNNING
             job.started_at = datetime.now(timezone.utc)
             proc.start()
+            logger.info("gen.start session_id=%s job_id=%s", session_id, job_id)
 
             watcher = Thread(target=self._watch_job, args=(job,), daemon=True)
             watcher.start()
@@ -127,14 +142,26 @@ class GenJobManager:
         with self._lock:
             if job.status == JobStatus.CANCELED:
                 self._active_by_session.pop(job.session_id, None)
+                logger.info("gen.done session_id=%s job_id=%s status=canceled", job.session_id, job.job_id)
                 return
             if result and result.get("status") == "ok":
                 job.status = JobStatus.COMPLETED
                 job.motion_csv = result.get("motion_csv")
                 job.iq = result.get("iq")
+                logger.info(
+                    "gen.done session_id=%s job_id=%s status=completed",
+                    job.session_id,
+                    job.job_id,
+                )
             else:
                 job.status = JobStatus.FAILED
                 job.error = (result or {}).get("error") or "job failed"
+                logger.info(
+                    "gen.done session_id=%s job_id=%s status=failed error=%s",
+                    job.session_id,
+                    job.job_id,
+                    job.error,
+                )
             job.finished_at = datetime.now(timezone.utc)
             self._active_by_session.pop(job.session_id, None)
 
@@ -154,4 +181,5 @@ class GenJobManager:
             self._active_by_session.pop(job.session_id, None)
             if job.process and job.process.is_alive():
                 job.process.terminate()
+            logger.info("gen.cancel session_id=%s job_id=%s", job.session_id, job.job_id)
             return job
