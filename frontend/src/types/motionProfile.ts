@@ -1,4 +1,4 @@
-export type MotionProfileType = 'simple'
+export type MotionProfileType = 'simple' | 'advance'
 
 export interface SimpleMotionProfile {
   type: 'simple'
@@ -15,7 +15,12 @@ export interface SimpleMotionProfile {
   }
 }
 
-export type MotionProfile = SimpleMotionProfile
+export interface AdvanceMotionProfile {
+  type: 'advance'
+  params: SimpleMotionProfile['params']
+}
+
+export type MotionProfile = SimpleMotionProfile | AdvanceMotionProfile
 
 export function createDefaultMotionProfile(): MotionProfile {
   return {

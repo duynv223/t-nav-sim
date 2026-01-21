@@ -979,7 +979,7 @@ function formatSegmentDistance(seg: { from: number; to: number }) {
               <tr class="bg-gray-50">
                 <th class="border border-gray-200 px-2 py-1 text-left font-semibold">#</th>
                 <th class="border border-gray-200 px-2 py-1 text-left font-semibold">Route</th>
-                <th class="border border-gray-200 px-2 py-1 text-left font-semibold">distance (m)</th>
+                <th class="border border-gray-200 px-2 py-1 text-left font-semibold">Distance (m)</th>
               </tr>
             </thead>
             <tbody>
@@ -1017,9 +1017,16 @@ function formatSegmentDistance(seg: { from: number; to: number }) {
               class="w-full px-2 py-1 border border-gray-300 rounded text-xs"
             >
               <option value="simple">Simple</option>
+              <option value="advance">Advance</option>
             </select>
           </div>
-          <div class="grid gap-2">
+          <div
+            v-if="route.motionProfile.type === 'advance'"
+            class="rounded-md border border-dashed border-gray-300 bg-gray-50 px-2 py-2 text-[11px] text-gray-500"
+          >
+            Will be developed to support per-segment speed profile editing.
+          </div>
+          <div v-else class="grid gap-2">
             <label class="flex items-center justify-between gap-2">
               <span class="text-gray-600">Cruise speed (km/h)</span>
               <input

@@ -31,3 +31,7 @@ Next Features:
 - [ ] Add Speed Bearing Control Dashboard
 
 - [ ] Support import nmeagen coordinate points (csv)
+
+- [ ] Support advance speed profile
+
+- [ ] Support run from selected segment
