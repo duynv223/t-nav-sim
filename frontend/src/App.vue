@@ -42,7 +42,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import AppSidebar from './components/AppSidebar.vue'
 import RouteSimulationWorkspace from './components/RouteSimulationWorkspace.vue'
 import SettingsPanel from './components/SettingsPanel.vue'
@@ -68,6 +68,10 @@ const telemetry = ref<any>({})
 const mode = ref<'view'|'add'>('view')
 const simState = ref<'idle' | 'running' | 'paused' | 'stopped'>('idle')
 const simStatus = ref<{ stage: string; detail?: string } | null>(null)
+const ROUTE_STORAGE_KEY = 'navsim.route'
+let restoringRoute = false
+const isMapReady = ref(false)
+let pendingRoute: Route | null = null
 
 // ESC key handler
 function handleKeyDown(e: KeyboardEvent){
@@ -85,12 +89,23 @@ function handleKeyDown(e: KeyboardEvent){
 onMounted(() => {
   window.addEventListener('keydown', handleKeyDown)
   window.addEventListener('load-route', handleLoadRoute as EventListener)
+  window.addEventListener('map-ready', handleMapReady as EventListener)
+  if ((window as any).__navsimMapReady) {
+    handleMapReady()
+  }
+  restoreRouteFromStorage()
 })
 
 onUnmounted(() => {
   window.removeEventListener('keydown', handleKeyDown)
   window.removeEventListener('load-route', handleLoadRoute as EventListener)
+  window.removeEventListener('map-ready', handleMapReady as EventListener)
 })
+
+watch(route, () => {
+  if (restoringRoute) return
+  persistRouteToStorage()
+}, { deep: true })
 
 // Handle load-route event from RouteControlPanel
 function handleLoadRoute(event: CustomEvent) {
@@ -104,41 +119,8 @@ function handleLoadRoute(event: CustomEvent) {
   const motionProfile = data.scenario.motion_profile
   const routeId = data.scenario.meta?.name
 
-  // Create new route from loaded data
-  const newRoute = new Route()
-  
-  // Add waypoints
-  waypoints.forEach((wp: { lat: number, lon: number }) => {
-    newRoute.addPoint(wp.lat, wp.lon)
-  })
-  
-  // Set route ID
-  newRoute.routeId = routeId || 'Loaded Route'
-
-  if (motionProfile && motionProfile.type === 'simple' && motionProfile.params) {
-    newRoute.motionProfile = motionProfile
-  }
-  
-  // Assign to reactive ref
-  route.value = newRoute
-  
-  // Switch to view mode after loading
-  mode.value = 'view'
-  
-  // Trigger map re-render after route is loaded
-  setTimeout(() => {
-    const renderEvent = new CustomEvent('route-loaded')
-    window.dispatchEvent(renderEvent)
-  }, 100)
-  
-  // Focus map on first point if available
-  if (newRoute.points.length > 0) {
-    const firstPoint = newRoute.points[0]
-    const focusEvent = new CustomEvent('map-focus', { 
-      detail: { lat: firstPoint.lat, lon: firstPoint.lon, zoom: 14 } 
-    })
-    window.dispatchEvent(focusEvent)
-  }
+  const newRoute = buildRouteFromPayload(waypoints, motionProfile, routeId)
+  queueRouteApply(newRoute)
 }
 
 function onAddWaypoint(pt:{lat:number,lon:number}){
@@ -211,6 +193,92 @@ function resetRoute(){
 
 function updateTelemetry(next: any) {
   telemetry.value = next
+}
+
+function handleMapReady() {
+  if (isMapReady.value) return
+  isMapReady.value = true
+  if (pendingRoute) {
+    applyLoadedRoute(pendingRoute)
+    pendingRoute = null
+  }
+}
+
+function buildRouteFromPayload(
+  waypoints: Array<{ lat: number; lon: number }>,
+  motionProfile: any,
+  routeId: string | undefined
+) {
+  const newRoute = new Route()
+  waypoints.forEach((wp: { lat: number, lon: number }) => {
+    newRoute.addPoint(wp.lat, wp.lon)
+  })
+  newRoute.routeId = routeId || 'Loaded Route'
+  if (motionProfile && motionProfile.type === 'simple' && motionProfile.params) {
+    newRoute.motionProfile = motionProfile
+  }
+  return newRoute
+}
+
+function applyLoadedRoute(newRoute: Route) {
+  if (!isMapReady.value) {
+    pendingRoute = newRoute
+    return
+  }
+  restoringRoute = true
+  route.value = newRoute
+  mode.value = 'view'
+  setTimeout(() => {
+    const renderEvent = new CustomEvent('route-loaded')
+    window.dispatchEvent(renderEvent)
+  }, 100)
+  if (newRoute.points.length > 0) {
+    const firstPoint = newRoute.points[0]
+    const focusEvent = new CustomEvent('map-focus', {
+      detail: { lat: firstPoint.lat, lon: firstPoint.lon, zoom: 14 }
+    })
+    window.dispatchEvent(focusEvent)
+  }
+  restoringRoute = false
+  persistRouteToStorage()
+}
+
+function persistRouteToStorage() {
+  const snapshot = {
+    routeId: route.value.routeId,
+    points: route.value.points.map(p => ({ lat: p.lat, lon: p.lon })),
+    motionProfile: route.value.motionProfile
+  }
+  sessionStorage.setItem(ROUTE_STORAGE_KEY, JSON.stringify(snapshot))
+}
+
+function restoreRouteFromStorage() {
+  const raw = sessionStorage.getItem(ROUTE_STORAGE_KEY)
+  if (!raw) return
+  try {
+    const snapshot = JSON.parse(raw) as {
+      routeId?: string
+      points?: Array<{ lat: number; lon: number }>
+      motionProfile?: any
+    }
+    if (!snapshot.points || snapshot.points.length === 0) return
+    const newRoute = buildRouteFromPayload(
+      snapshot.points,
+      snapshot.motionProfile,
+      snapshot.routeId
+    )
+    queueRouteApply(newRoute)
+  } catch (err) {
+    console.error('Failed to restore route:', err)
+  }
+}
+
+function queueRouteApply(newRoute: Route) {
+  if (isMapReady.value) {
+    applyLoadedRoute(newRoute)
+  } else {
+    pendingRoute = newRoute
+  }
 }
 
 // expose to MapView

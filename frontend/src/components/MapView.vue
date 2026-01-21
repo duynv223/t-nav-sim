@@ -93,6 +93,7 @@ const searchResults = ref<Array<{ title: string; lat: number; lon: number; addre
 const searchError = ref('')
 const isSearching = ref(false)
 const hereApiKey = import.meta.env.VITE_HERE_API_KEY || ''
+const MAP_READY_FLAG = '__navsimMapReady'
 
 // Setup composables
 const callbacks: EditorCallbacks = {
@@ -241,6 +242,7 @@ function selectSearchResult(result: { lat: number; lon: number }) {
 
 onMounted(async ()=>{
   const apiKey = import.meta.env.VITE_HERE_API_KEY || ''
+  ;(window as any)[MAP_READY_FLAG] = false
   if(!apiKey){
     console.error('❌ VITE_HERE_API_KEY not set! Please set in frontend/.env')
     console.log('Get your free API key at: https://developer.here.com/')
@@ -250,6 +252,9 @@ onMounted(async ()=>{
   // Skip if map already exists (for HMR)
   if (map.value) {
     console.log('[MapView] Map already exists, skipping initialization')
+    isLoading.value = false
+    ;(window as any)[MAP_READY_FLAG] = true
+    window.dispatchEvent(new CustomEvent('map-ready'))
     return
   }
   
@@ -334,6 +339,7 @@ onMounted(async ()=>{
         mapReadyDispatched = true
         console.log('[MapView] Map rendering complete, dispatching map-ready event')
         isLoading.value = false // Hide loading overlay
+        ;(window as any)[MAP_READY_FLAG] = true
         window.dispatchEvent(new CustomEvent('map-ready'))
       }
     }
@@ -357,6 +363,7 @@ onMounted(async ()=>{
 // Cleanup on unmount
 onUnmounted(() => {
   console.log('[MapView] Cleaning up...')
+  ;(window as any)[MAP_READY_FLAG] = false
   
   // Remove event listeners
   window.removeEventListener('map-focus', handleMapFocus as EventListener)

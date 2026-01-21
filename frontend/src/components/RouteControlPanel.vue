@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, watch, nextTick, computed, onBeforeUnmount } from 'vue'
+import { ref, watch, nextTick, computed, onBeforeUnmount, onMounted } from 'vue'
 import { Route as MapRoute } from '@/types/route'
 import { MapPinPlus, Trash2, Play, Square, ChevronDown, Download, Upload, LocateFixed, Loader2, Info } from 'lucide-vue-next'
 
@@ -49,6 +49,7 @@ const buildJobId = ref<string | null>(null)
 const buildEventSource = ref<EventSource | null>(null)
 const runJobId = ref<string | null>(null)
 const runEventSource = ref<EventSource | null>(null)
+const SESSION_STORAGE_KEY = 'navsim.simState'
 
 const apiBaseUrl = import.meta.env.VITE_SIM_API_URL || 'http://localhost:8000'
 
@@ -128,6 +129,140 @@ onBeforeUnmount(() => {
   stopBuildEvents()
   stopRunEvents()
 })
+
+onMounted(() => {
+  const stored = readSimState()
+  if (!stored) return
+  restoreSimState(stored)
+})
+
+watch(
+  () => [
+    sessionId.value,
+    buildStatus.value,
+    buildJobId.value,
+    runStatus.value,
+    runJobId.value,
+    buildStartEnabled.value,
+    buildStartTime.value,
+    runStartTime.value,
+    realtime.value,
+    gpsOnly.value
+  ],
+  () => {
+    persistSimState()
+  }
+)
+
+type StoredSimState = {
+  sessionId: string | null
+  buildStatus: BuildStatus
+  buildJobId: string | null
+  runStatus: RunStatus
+  runJobId: string | null
+  buildStartEnabled: boolean
+  buildStartTime: string
+  runStartTime: string
+  realtime: boolean
+  gpsOnly: boolean
+}
+
+function readSimState(): StoredSimState | null {
+  const raw = sessionStorage.getItem(SESSION_STORAGE_KEY)
+  if (!raw) return null
+  try {
+    return JSON.parse(raw) as StoredSimState
+  } catch {
+    sessionStorage.removeItem(SESSION_STORAGE_KEY)
+    return null
+  }
+}
+
+function persistSimState() {
+  const payload: StoredSimState = {
+    sessionId: sessionId.value,
+    buildStatus: buildStatus.value,
+    buildJobId: buildJobId.value,
+    runStatus: runStatus.value,
+    runJobId: runJobId.value,
+    buildStartEnabled: buildStartEnabled.value,
+    buildStartTime: buildStartTime.value,
+    runStartTime: runStartTime.value,
+    realtime: realtime.value,
+    gpsOnly: gpsOnly.value
+  }
+  sessionStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify(payload))
+}
+
+async function restoreSimState(stored: StoredSimState) {
+  buildStartEnabled.value = stored.buildStartEnabled ?? false
+  buildStartTime.value = stored.buildStartTime || buildStartTime.value
+  runStartTime.value = stored.runStartTime || runStartTime.value
+  realtime.value = stored.realtime ?? false
+  gpsOnly.value = stored.gpsOnly ?? false
+
+  if (!stored.sessionId) {
+    return
+  }
+  try {
+    const response = await fetch(`${apiBaseUrl}/sessions/${stored.sessionId}`)
+    if (!response.ok) {
+      sessionStorage.removeItem(SESSION_STORAGE_KEY)
+      return
+    }
+    sessionId.value = stored.sessionId
+
+    if (stored.buildJobId) {
+      await restoreBuildJob(stored.sessionId, stored.buildJobId)
+    } else {
+      buildStatus.value = stored.buildStatus || 'none'
+    }
+
+    if (stored.runJobId) {
+      await restoreRunJob(stored.sessionId, stored.runJobId)
+    } else {
+      runStatus.value = stored.runStatus || 'idle'
+    }
+  } catch (err) {
+    console.error('Failed to restore session:', err)
+  }
+}
+
+async function restoreBuildJob(id: string, jobId: string) {
+  try {
+    const response = await fetch(`${apiBaseUrl}/sessions/${id}/gen/${jobId}`)
+    if (!response.ok) {
+      buildJobId.value = null
+      buildStatus.value = 'none'
+      return
+    }
+    const job = await response.json()
+    handleBuildJob(job)
+    if (job.status === 'running' || job.status === 'pending') {
+      startBuildEvents()
+    }
+  } catch (err) {
+    console.error('Failed to restore build job:', err)
+  }
+}
+
+async function restoreRunJob(id: string, jobId: string) {
+  try {
+    const response = await fetch(`${apiBaseUrl}/sessions/${id}/run/${jobId}`)
+    if (!response.ok) {
+      runJobId.value = null
+      runStatus.value = 'idle'
+      return
+    }
+    const job = await response.json()
+    handleRunJob(job)
+    if (job.status === 'running' || job.status === 'waiting' || job.status === 'pending') {
+      startRunEvents()
+    }
+  } catch (err) {
+    console.error('Failed to restore run job:', err)
+  }
+}
 
 async function ensureSession() {
   if (sessionId.value) return sessionId.value
